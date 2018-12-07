@@ -191,16 +191,16 @@ void loop()
 
     getInfo2();
     fromLog();
-    //delay(2000);
+    delay(2000);
 
 
 
-    MOSFET_FIRE (1);
-    delay(1000);
-    MOSFET_FIRE (2);
-    delay(1000);
-    MOSFET_FIRE (3);
-    delay(3000);
+//    MOSFET_FIRE (1);
+//    delay(1000);
+//    MOSFET_FIRE (2);
+//    delay(1000);
+//    MOSFET_FIRE (3);
+//    delay(3000);
     
     
   }
