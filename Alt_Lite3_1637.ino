@@ -100,7 +100,7 @@ void setup()
   MOSFET_3 = 17;
 
   Fallen = false;
-  Cycles = 100;
+  Cycles = 150;
   Apogee = 0;
   Maxspeed = 0;
 
@@ -117,10 +117,6 @@ void setup()
   pinMode(BUTTON, INPUT_PULLUP); // BUTTON PIN
 
 
-  byte welcome_banner[] = {_H, _E, _L, _L, _O, _empty, _empty,
-
-                          };
-  disp.runningString(welcome_banner, sizeof(welcome_banner), 200);
 
 
   Serial.begin(115200);
@@ -130,7 +126,7 @@ void setup()
 
   if (!bme.begin()) {
     disp.clear();
-    disp.displayInt(-280);
+    disp.displayInt(280);
     Serial.println("BMP280 NOT FOUND!");
     while (1) {}
   }
@@ -141,9 +137,32 @@ void setup()
     Serial.print("Status:");
     Serial.println(status);
     disp.clear();
-    disp.displayInt(-9250);
+    disp.displayInt(9250);
     while (1) {}
   }
+
+
+  for (int q = 0; q < 16; q++)
+  {
+    byte testbyte = random(255);
+    g_eeprom.write(32000 + q, testbyte);
+    delay(100);
+
+    if (g_eeprom.read(32000 + q) != testbyte )
+    {
+      Serial.println("EXTERNAL EEPROM ERROR!");
+      disp.clear();
+      disp.displayInt(9999);
+      while (1) {}
+    }
+  }
+
+  byte welcome_banner[] = {_H, _E, _L, _L, _O, _empty, _empty,
+                          };
+  delay(500);
+  disp.clear();
+  disp.runningString(welcome_banner, sizeof(welcome_banner), 200);
+
 
 
   SEALEVELPRESSURE_HPA = bme.readPressure() / 100.0;
@@ -194,15 +213,6 @@ void loop()
     delay(2000);
 
 
-
-//    MOSFET_FIRE (1);
-//    delay(1000);
-//    MOSFET_FIRE (2);
-//    delay(1000);
-//    MOSFET_FIRE (3);
-//    delay(3000);
-    
-    
   }
 
   disp.clear();
@@ -229,7 +239,7 @@ void loop()
 
 
     digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-    //*tone (BUZZER, 200, 3);
+    tone (BUZZER, 200, 3);
 
     if (Fallen and !MOSFET_1_IS_FIRED)
 
@@ -249,6 +259,27 @@ void loop()
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                                     PRAYING FOR RECOVERY                                      //
   ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+  //  disp.clear();
+  //  disp.displayInt(8888);
+  //  delay (2000);
+  //
+  //  disp.clear();
+  //  disp.displayInt(1);
+  //  MOSFET_FIRE (1);
+  //  delay (2000);
+  //
+  //
+  //  disp.clear();
+  //  disp.displayInt(2);
+  //  MOSFET_FIRE (2);
+  //  delay (2000);
+  //
+  //  disp.clear();
+  //  disp.displayInt(3);
+  //  MOSFET_FIRE (3);
+  //  delay (2000);
+
 
   toLog ("Finish Logging");
 
@@ -417,7 +448,7 @@ void MOSFET_FIRE (byte Number)
     case 1:
       tone (BUZZER, 500, 10);
       digitalWrite(MOSFET_1, HIGH);
-      delay(200);
+      delay(250);
       digitalWrite(MOSFET_1, LOW);
 
       MOSFET_1_IS_FIRED = true;
@@ -429,7 +460,7 @@ void MOSFET_FIRE (byte Number)
     case 2:
       tone (BUZZER, 700, 10);
       digitalWrite(MOSFET_2, HIGH);
-      delay(200);
+      delay(250);
       digitalWrite(MOSFET_2, LOW);
 
       MOSFET_2_IS_FIRED = true;
@@ -440,7 +471,7 @@ void MOSFET_FIRE (byte Number)
     case 3:
       tone (BUZZER, 900, 10);
       digitalWrite(MOSFET_3, HIGH);
-      delay(200);
+      delay(250);
       digitalWrite(MOSFET_3, LOW);
 
       MOSFET_3_IS_FIRED = true;
@@ -521,7 +552,7 @@ void getInfo2()
 
     bx            =  telemetry.bx;
     by            =  telemetry.by;
-    bz            =  telemetry.bz - 127;
+    bz            =  telemetry.bz;
 
     float DT_bx = bx;
     float DT_by = by;
@@ -622,9 +653,3 @@ void LOGonOSD()
   disp.displayInt(Maxspeed);
   delay (6000);
 }
-
-
-
-
-
-
