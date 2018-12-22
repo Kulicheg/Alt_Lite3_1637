@@ -239,7 +239,7 @@ void loop()
 
 
     digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-    tone (BUZZER, 200, 3);
+   // tone (BUZZER, 200, 3);
 
     if (Fallen and !MOSFET_1_IS_FIRED)
 
@@ -357,11 +357,11 @@ void getdata()
 
   float fbax, fbay, fbaz;
 
-  fbax = IMU.getGyroX_rads(); //, 6
+  fbax = IMU.getGyroX_rads(); 
   fbay = IMU.getGyroY_rads();
   fbaz = IMU.getGyroZ_rads();
 
-  fbax = fbax * 57.2958 ;
+  fbax = fbax * 57.2958;
   fbay = fbay * 57.2958;
   fbaz = fbaz * 57.2958;
 
@@ -537,7 +537,7 @@ void getInfo2()
   byte Packet[PackSize];
 
 
-  Serial.println ("Alt, Spd,  Prs,  Tmp,   bx,   by,    bz,         gX,      gY,      gZ");
+  Serial.println ("Alt\t Spd\t Prs\t Tmp\t bx\t by\t bz\t gX\t gY\t gZ");
   Serial.println (" ");
 
   for (int Rec = 0; Rec < Cycles; Rec++)
@@ -567,6 +567,7 @@ void getInfo2()
     bay           = telemetry.bay;
     baz           = telemetry.baz;
 
+
     Pressure      = telemetry.Pressure;
     Temperature   = telemetry.Temperature;
     Altitude      = telemetry.Altitude;
@@ -576,23 +577,23 @@ void getInfo2()
 
 
     Serial.print (Altitude);
-    Serial.print (", ");
+    Serial.print("\t");
     Serial.print (Speed2);
-    Serial.print (",  ");
+    Serial.print("\t");
     Serial.print (Pressure);
-    Serial.print (",  ");
+    Serial.print("\t");
     Serial.print (Temperature);
-    Serial.print (",  ");
+    Serial.print("\t");
     Serial.print (DT_bx, 2);
-    Serial.print (", ");
+    Serial.print("\t");
     Serial.print (DT_by, 2);
-    Serial.print (",  ");
+    Serial.print("\t");
     Serial.print (DT_bz, 2);
-    Serial.print (",      ");
+    Serial.print("\t");
     Serial.print (round(bax));
-    Serial.print (",      ");
+    Serial.print("\t");
     Serial.print (round (bay));
-    Serial.print (",      ");
+    Serial.print("\t");
     Serial.println (round (baz));
 
     EEXPos = EEXPos + PackSize;
