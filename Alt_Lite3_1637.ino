@@ -100,7 +100,7 @@ void setup()
   MOSFET_3 = 17;
 
   Fallen = false;
-  Cycles = 150;
+  Cycles = 1200;
   Apogee = 0;
   Maxspeed = 0;
 
@@ -120,7 +120,7 @@ void setup()
 
 
   Serial.begin(115200);
-  Wire.begin(); // to Test why it here
+  Wire.begin(); // to Test why it here(EEPROM)
 
 
 
@@ -239,7 +239,7 @@ void loop()
 
 
     digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-   // tone (BUZZER, 200, 3);
+    tone (BUZZER, 200, 3);
 
     if (Fallen and !MOSFET_1_IS_FIRED)
 
@@ -251,8 +251,8 @@ void loop()
     // delay(5);
     Finish2 = millis();
     routineTime = Finish2 - Start2;
-    disp.clear();
-    disp.displayInt(routineTime);
+//    disp.clear();
+//    disp.displayInt(routineTime);
 
   }
 
@@ -286,18 +286,21 @@ void loop()
   EEPROM.put(950, Maxspeed);
   toLog ("Maximum Speed " + String (Maxspeed));
 
+
   getInfo2();
   fromLog();
 
-
   disp.clear();
+  disp.displayInt(Apogee);
+
+
 
   while (1)
   {
-    //    tone (BUZZER, 1800, 1000);
-    //    delay (1000);
-    //    tone (BUZZER, 2200, 1000);
-    //    delay (1000);
+        tone (BUZZER, 1800, 1000);
+        delay (1000);
+        tone (BUZZER, 2200, 1000);
+        delay (1000);
 
   }
 }
@@ -341,9 +344,9 @@ void getdata()
   IMU.readSensor();
 
 
-  cx1 = IMU.getAccelX_mss(), 6;
-  cy1 = IMU.getAccelY_mss(), 6;
-  cz1 = IMU.getAccelZ_mss(), 6;
+  cx1 = IMU.getAccelX_mss();
+  cy1 = IMU.getAccelY_mss();
+  cz1 = IMU.getAccelZ_mss();
 
   cx1 = cx1 * 10;
   cy1 = cy1 * 10;
@@ -357,7 +360,7 @@ void getdata()
 
   float fbax, fbay, fbaz;
 
-  fbax = IMU.getGyroX_rads(); 
+  fbax = IMU.getGyroX_rads();
   fbay = IMU.getGyroY_rads();
   fbaz = IMU.getGyroZ_rads();
 
@@ -446,6 +449,7 @@ void MOSFET_FIRE (byte Number)
   switch (Number)
   {
     case 1:
+      disp.clear();
       tone (BUZZER, 500, 10);
       digitalWrite(MOSFET_1, HIGH);
       delay(250);
@@ -458,6 +462,7 @@ void MOSFET_FIRE (byte Number)
       break;
 
     case 2:
+      disp.clear();
       tone (BUZZER, 700, 10);
       digitalWrite(MOSFET_2, HIGH);
       delay(250);
@@ -469,6 +474,7 @@ void MOSFET_FIRE (byte Number)
       break;
 
     case 3:
+      disp.clear();
       tone (BUZZER, 900, 10);
       digitalWrite(MOSFET_3, HIGH);
       delay(250);
@@ -634,9 +640,7 @@ float speedOmeter()
 
     if (Speed > Maxspeed) {
       Maxspeed = Speed;
-      Serial.println("Maxspeed");
     }
-    Serial.println(Maxspeed);
   }
   return Speed;
 
