@@ -229,6 +229,9 @@ void loop()
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   Maxspeed = 0;
   toLog ("Start Logging");
+  disp.clear();
+
+
   for (int FSTage = 1; FSTage <= Cycles; FSTage++)
   {
     Start2 = millis();
@@ -251,8 +254,8 @@ void loop()
     // delay(5);
     Finish2 = millis();
     routineTime = Finish2 - Start2;
-//    disp.clear();
-//    disp.displayInt(routineTime);
+    //    disp.clear();
+    //    disp.displayInt(routineTime);
 
   }
 
@@ -297,10 +300,10 @@ void loop()
 
   while (1)
   {
-        tone (BUZZER, 1800, 1000);
-        delay (1000);
-        tone (BUZZER, 2200, 1000);
-        delay (1000);
+    tone (BUZZER, 1800, 1000);
+    delay (1000);
+    tone (BUZZER, 2200, 1000);
+    delay (1000);
 
   }
 }
@@ -648,12 +651,14 @@ float speedOmeter()
 
 void LOGonOSD()
 {
+  tone (BUZZER, 300, 5);
   EEPROM.get (930, Apogee);
   EEPROM.get (950, Maxspeed);
 
   disp.clear();
   disp.displayInt(Apogee);
   delay (6000);
+  tone (BUZZER, 300, 5);
   disp.clear();
   disp.displayInt(Maxspeed);
   delay (6000);
