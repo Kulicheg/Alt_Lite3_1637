@@ -5,7 +5,7 @@
 //I2C device found at address 0x76 !  BMP
 // 950 - 953 - Max Speed
 // 947 - 947 - NumRec
-
+// 945 - 946 - Apogee
 //A,B,C,D,E,F,G,H,J,L,N,O,P,S,U,Y,a,b,c,d,e,f,h,i,j,l,n,o,q,r,t,u,y,dash,under,equal,empty,degree
 
 
@@ -423,7 +423,7 @@ void fallingSense ()
     {
       Apogee = oldAltitude;
       toLog ("Falling detected " + String(Apogee));
-      EEPROM.put(930, Apogee);
+      EEPROM.put(945, Apogee);
       Fallen = true;
     }
 
@@ -534,7 +534,7 @@ void fromLog ()
 void getInfo2()
 {
   EEXPos = 0;
-  EEPROM.get (930, Apogee);
+  EEPROM.get (945, Apogee);
   Serial.print ("Apogee = ");
   Serial.println (Apogee);
 
@@ -652,7 +652,7 @@ float speedOmeter()
 void LOGonOSD()
 {
   tone (BUZZER, 300, 5);
-  EEPROM.get (930, Apogee);
+  EEPROM.get (945, Apogee);
   EEPROM.get (950, Maxspeed);
 
   disp.clear();
