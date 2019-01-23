@@ -32,7 +32,7 @@
 
 
 Adafruit_BMP280 bme;
-AT24C256 g_eeprom(0x50);
+AT24C256 driveD(0x50);
 MPU9250 IMU(Wire, 0x68);
 GyverTM1637 disp(CLK, DIO);
 
@@ -68,6 +68,13 @@ byte MOSFET_1, MOSFET_2, MOSFET_3;
 boolean MOSFET_1_IS_FIRED, MOSFET_2_IS_FIRED, MOSFET_3_IS_FIRED;
 int Maxspeed;
 
+byte JournalSize;
+byte currentByte;
+byte header [4] = {170, 171, 186, 187};
+byte command;
+
+
+
 struct telemetrystruct
 {
   int bax, bay, baz;
@@ -100,10 +107,11 @@ void setup()
   MOSFET_3 = 17;
 
   Fallen = false;
-  Cycles = 1200;
+  Cycles = 400;
   Apogee = 0;
   Maxspeed = 0;
 
+  JournalSize = sizeof (capitansLog);
   PackSize = sizeof (telemetry);
 
   disp.clear();
@@ -120,7 +128,7 @@ void setup()
 
 
   Serial.begin(115200);
-  Wire.begin(); // to Test why it here(EEPROM)
+  Wire.begin(); // to Test why it here(EEPROM 24C)
 
 
 
@@ -145,10 +153,10 @@ void setup()
   for (int q = 0; q < 16; q++)
   {
     byte testbyte = random(255);
-    g_eeprom.write(32000 + q, testbyte);
-    delay(100);
+    driveD.write(32000 + q, testbyte);
+    delay(25);
 
-    if (g_eeprom.read(32000 + q) != testbyte )
+    if (driveD.read(32000 + q) != testbyte )
     {
       Serial.println("EXTERNAL EEPROM ERROR!");
       disp.clear();
@@ -156,10 +164,9 @@ void setup()
       while (1) {}
     }
   }
-
-  byte welcome_banner[] = {_H, _E, _L, _L, _O, _empty, _empty,
-                          };
   delay(500);
+
+  byte welcome_banner[] = {_H, _E, _L, _L, _O, _empty, _empty,};
   disp.clear();
   disp.runningString(welcome_banner, sizeof(welcome_banner), 200);
 
@@ -254,34 +261,11 @@ void loop()
     // delay(5);
     Finish2 = millis();
     routineTime = Finish2 - Start2;
-    //    disp.clear();
-    //    disp.displayInt(routineTime);
-
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                                     PRAYING FOR RECOVERY                                      //
   ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-  //  disp.clear();
-  //  disp.displayInt(8888);
-  //  delay (2000);
-  //
-  //  disp.clear();
-  //  disp.displayInt(1);
-  //  MOSFET_FIRE (1);
-  //  delay (2000);
-  //
-  //
-  //  disp.clear();
-  //  disp.displayInt(2);
-  //  MOSFET_FIRE (2);
-  //  delay (2000);
-  //
-  //  disp.clear();
-  //  disp.displayInt(3);
-  //  MOSFET_FIRE (3);
-  //  delay (2000);
 
 
   toLog ("Finish Logging");
@@ -327,7 +311,7 @@ void Writelog()
 
   for (bufwrite = 0; bufwrite < PackSize; bufwrite++)
   {
-    g_eeprom.write(EEXPos + bufwrite, telemetry_bytes[bufwrite]);
+    driveD.write(EEXPos + bufwrite, telemetry_bytes[bufwrite]);
   }
   EEXPos = EEXPos + PackSize;
 
@@ -423,7 +407,7 @@ void fallingSense ()
     {
       Apogee = oldAltitude;
       toLog ("Falling detected " + String(Apogee));
-      EEPROM.put(930, Apogee);
+      EEPROM.put(945, Apogee);
       Fallen = true;
     }
 
@@ -534,7 +518,7 @@ void fromLog ()
 void getInfo2()
 {
   EEXPos = 0;
-  EEPROM.get (930, Apogee);
+  EEPROM.get (945, Apogee);
   Serial.print ("Apogee = ");
   Serial.println (Apogee);
 
@@ -553,7 +537,7 @@ void getInfo2()
   {
     for (int intern = 0; intern < PackSize; intern++)
     {
-      Packet[intern] = g_eeprom.read(EEXPos + intern);
+      Packet[intern] = driveD.read(EEXPos + intern);
     }
 
     memcpy(&telemetry, Packet, sizeof(telemetry));
@@ -584,7 +568,8 @@ void getInfo2()
     float Speed2  =  Speed;
 
 
-
+    Serial.print (EEXPos);
+    Serial.print("\t");
     Serial.print (Altitude);
     Serial.print("\t");
     Serial.print (Speed2);
@@ -608,7 +593,7 @@ void getInfo2()
     EEXPos = EEXPos + PackSize;
   }
   Serial.println ("-----------------------------------------------------");
-
+  Serial.println (EEXPos);
 }
 
 
@@ -652,7 +637,7 @@ float speedOmeter()
 void LOGonOSD()
 {
   tone (BUZZER, 300, 5);
-  EEPROM.get (930, Apogee);
+  EEPROM.get (945, Apogee);
   EEPROM.get (950, Maxspeed);
 
   disp.clear();
@@ -662,4 +647,63 @@ void LOGonOSD()
   disp.clear();
   disp.displayInt(Maxspeed);
   delay (6000);
+
+  disp.clear();
+  disp.displayInt(433);
+
+  SendData();
+}
+
+void SendData()
+{
+  sendheader(01);
+
+  Serial.write (NumRec);
+  Serial.write (highByte(Cycles));
+  Serial.write (lowByte(Cycles));
+  Serial.flush();
+  delay (200);
+
+  sendheader(02);
+
+
+  /////////////////////////////////////SEND CYCLES////////////////////////////////////////////////
+  //tone (3, 1000, 5);
+  for ( int q = 0; q < Cycles * PackSize; q++)
+  {
+    byte Sendbyte = driveD.read (q);
+    Serial.write (Sendbyte);
+  }
+  Serial.flush();
+  delay (200);
+  ////////////////////////////////////////////////////////////////////////////////////////////////
+
+  /////////////////////////////////////SEND JOURNAL///////////////////////////////////////////////
+  //tone (3, 1000, 5);
+  for ( int q = 0; q < NumRec * JournalSize; q++)
+  {
+    byte Sendbyte = EEPROM.read (q);
+    Serial.write (Sendbyte);
+  }
+  Serial.flush();
+  delay (200);
+  /////////////////////////////////////SEND DUMP////////////////////////////////////////////////
+  //tone (3, 1000, 5);
+  for ( int q = 945; q < 1024 ; q++)
+  {
+    byte Sendbyte = EEPROM.read (q);
+    Serial.write (Sendbyte);
+  }
+  Serial.flush();
+  ////////////////////////////////////////////////////////////////////////////////////////////////
+  //tone (3, 500, 5);
+}
+
+void sendheader(byte command)
+{
+  for (byte q = 0; q < 4; q++)
+  {
+    Serial.write (header[q]);
+  }
+  Serial.write (command);
 }
