@@ -19,23 +19,20 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h>
 #include <EEPROM.h>
-#include <AT24C256.h>
+#include <FM24C256.h>
 #include "MPU9250.h"
 #include "GyverTM1637.h"
 
 #define CLK 12
 #define DIO 11
-
-
 #define BUTTON 13
 #define BUZZER 14
 
 
 Adafruit_BMP280 bme;
-AT24C256 driveD(0x50);
+FM24C256 driveD(0x50);
 MPU9250 IMU(Wire, 0x68);
 GyverTM1637 disp(CLK, DIO);
-
 
 
 float SEALEVELPRESSURE_HPA;
@@ -107,7 +104,7 @@ void setup()
   MOSFET_3 = 17;
 
   Fallen = false;
-  Cycles = 400;
+  Cycles = 600;
   Apogee = 0;
   Maxspeed = 0;
 
@@ -128,7 +125,7 @@ void setup()
 
 
   Serial.begin(115200);
-  Wire.begin(); // to Test why it here(EEPROM 24C)
+  Wire.begin();
 
 
 
@@ -154,8 +151,7 @@ void setup()
   {
     byte testbyte = random(255);
     driveD.write(32000 + q, testbyte);
-    delay(25);
-
+    
     if (driveD.read(32000 + q) != testbyte )
     {
       Serial.println("EXTERNAL EEPROM ERROR!");
@@ -258,9 +254,10 @@ void loop()
     }
 
 
-    // delay(5);
+    delay(90);
     Finish2 = millis();
     routineTime = Finish2 - Start2;
+    disp.displayInt(routineTime);
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -289,6 +286,9 @@ void loop()
     tone (BUZZER, 2200, 1000);
     delay (1000);
 
+
+if (!digitalRead(BUTTON))   break;
+  
   }
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -403,7 +403,7 @@ void fallingSense ()
 
   if (!Fallen) {
 
-    if ((oldAltitude - newAltitude) > 3)
+    if ((oldAltitude - newAltitude) > 2)
     {
       Apogee = oldAltitude;
       toLog ("Falling detected " + String(Apogee));
@@ -414,7 +414,7 @@ void fallingSense ()
 
 
     FirstTime = millis();
-    if (FirstTime - SecondTime >= 2000)
+    if (FirstTime - SecondTime >= 1000)
     {
 
 
@@ -530,7 +530,7 @@ void getInfo2()
   byte Packet[PackSize];
 
 
-  Serial.println ("Alt\t Spd\t Prs\t Tmp\t bx\t by\t bz\t gX\t gY\t gZ");
+  Serial.println ("EEXPos\t Alt\t Spd\t Prs\t Tmp\t bx\t by\t bz\t gX\t gY\t gZ");
   Serial.println (" ");
 
   for (int Rec = 0; Rec < Cycles; Rec++)
