@@ -27,8 +27,8 @@
 #define DIO 11
 
 
-#define BUTTON 7
-#define BUZZER 3
+#define BUTTON 13
+#define BUZZER 14
 
 
 Adafruit_BMP280 bme;
@@ -107,7 +107,7 @@ void setup()
   MOSFET_3 = 17;
 
   Fallen = false;
-  Cycles = 400;
+  Cycles = 500;
   Apogee = 0;
   Maxspeed = 0;
 
