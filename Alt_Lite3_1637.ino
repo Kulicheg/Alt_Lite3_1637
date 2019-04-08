@@ -8,12 +8,6 @@
 // 945 - 946 - Apogee
 //A,B,C,D,E,F,G,H,J,L,N,O,P,S,U,Y,a,b,c,d,e,f,h,i,j,l,n,o,q,r,t,u,y,dash,under,equal,empty,degree
 
-
-
-
-
-
-
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
@@ -38,21 +32,18 @@ GyverTM1637 disp(CLK, DIO);
 float SEALEVELPRESSURE_HPA;
 int EEPOS  = 0;
 int EEXPos;
-int Altitude;
 float Alt1, Alt2;
 long int Pressure;
 boolean writeit;
 boolean powerLost;
 int PackSize;
-int Apogee;
 int bx, by, bz;
 int bax, bay, baz;
 float cx1, cy1, cz1;
 double xyz[3];
 double ax, ay, az;
 int x, y, z;
-int Temperature;
-int Speed;
+
 int bufwrite;
 int msgCount;
 int Cycles;
@@ -63,13 +54,17 @@ long int Start, Start2, Finish, Finish2, routineTime;
 long int FirstTime, SecondTime, oldAltitude, newAltitude, SecondTimeM, FirstTimeM;
 byte MOSFET_1, MOSFET_2, MOSFET_3;
 boolean MOSFET_1_IS_FIRED, MOSFET_2_IS_FIRED, MOSFET_3_IS_FIRED;
+
 int Maxspeed;
+float Altitude;
+int Apogee;
+int Temperature;
+float Speed;
 
 byte JournalSize;
 byte currentByte;
 byte header [4] = {170, 171, 186, 187};
 byte command;
-
 
 
 struct telemetrystruct
@@ -78,8 +73,8 @@ struct telemetrystruct
   int bx, by, bz;
   long int Pressure;
   int Temperature;
-  int Altitude;
-  int  Speed;
+  float Altitude;
+  float  Speed;
 };
 
 struct SystemLog
@@ -121,12 +116,8 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);   //LED#13
   pinMode(BUTTON, INPUT_PULLUP); // BUTTON PIN
 
-
-
-
   Serial.begin(115200);
   Wire.begin();
-
 
 
   if (!bme.begin()) {
@@ -151,7 +142,7 @@ void setup()
   {
     byte testbyte = random(255);
     driveD.write(32000 + q, testbyte);
-    
+
     if (driveD.read(32000 + q) != testbyte )
     {
       Serial.println("EXTERNAL EEPROM ERROR!");
@@ -183,7 +174,6 @@ void setup()
 //------------------------------------------------------------------------------
 void loop()
 {
-
   if (!digitalRead(BUTTON))
   {
     LOGonOSD();
@@ -200,11 +190,8 @@ void loop()
   disp.displayInt(bme.readPressure() * 0.00750062);
   delay (1000);
 
-
-
   Serial.print("PackSize:");
   Serial.println(PackSize);
-
 
   while (digitalRead(BUTTON))
   {
@@ -214,8 +201,6 @@ void loop()
     getInfo2();
     fromLog();
     delay(2000);
-
-
   }
 
   disp.clear();
@@ -223,9 +208,7 @@ void loop()
   Serial.println("POEKHALI!");
   delay (2000);
 
-
   EEXPos = 0;
-
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                                     FIRST STAGE                                               //
@@ -242,7 +225,6 @@ void loop()
     getdata();        // Получаем данные с датчиков в структуру
     Writelog();       // Пишем данные в EEPROM
     fallingSense ();  // Не падаем ли?
-
 
     digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
     tone (BUZZER, 200, 3);
@@ -270,7 +252,6 @@ void loop()
   EEPROM.put(950, Maxspeed);
   toLog ("Maximum Speed " + String (Maxspeed));
 
-
   getInfo2();
   fromLog();
 
@@ -287,8 +268,8 @@ void loop()
     delay (1000);
 
 
-if (!digitalRead(BUTTON))   break;
-  
+    if (!digitalRead(BUTTON))   break;
+
   }
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -304,20 +285,19 @@ if (!digitalRead(BUTTON))   break;
 void Writelog()
 {
 
-
-  unsigned char * telemetry_bytes;
-
-  telemetry_bytes = (unsigned char *) &telemetry;
-
-  for (bufwrite = 0; bufwrite < PackSize; bufwrite++)
+  if (EEXPos < 32500)
   {
-    driveD.write(EEXPos + bufwrite, telemetry_bytes[bufwrite]);
+    unsigned char * telemetry_bytes;
+
+    telemetry_bytes = (unsigned char *) &telemetry;
+
+    for (bufwrite = 0; bufwrite < PackSize; bufwrite++)
+    {
+      driveD.write(EEXPos + bufwrite, telemetry_bytes[bufwrite]);
+    }
+    EEXPos = EEXPos + PackSize;
   }
-  EEXPos = EEXPos + PackSize;
-
-
 }
-
 
 void getdata()
 {
@@ -325,11 +305,7 @@ void getdata()
   //                                     AXL SENSORS COLLECTION                                    //
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-
-
   IMU.readSensor();
-
 
   cx1 = IMU.getAccelX_mss();
   cy1 = IMU.getAccelY_mss();
@@ -363,7 +339,6 @@ void getdata()
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                                     OTHER SENSORS COLLECTION                                  //
   ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -391,17 +366,18 @@ void getdata()
   telemetry.Speed       = speedOmeter();
 
 
-
-
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
-
-
 void fallingSense ()
 {
-
   if (!Fallen) {
+
+    if (Speed < 5 and Altitude > 30)
+    {
+      Fallen = true;
+      toLog ("LOW Speed!A=" + String(Altitude) + "S=" + String(Speed));
+    }
 
     if ((oldAltitude - newAltitude) > 2)
     {
@@ -411,23 +387,14 @@ void fallingSense ()
       Fallen = true;
     }
 
-
-
     FirstTime = millis();
     if (FirstTime - SecondTime >= 1000)
     {
-
-
       SecondTime = millis();
       oldAltitude = newAltitude;
       newAltitude = Altitude;
-
-
     }
-
-
   }
-
 }
 
 
@@ -474,7 +441,6 @@ void MOSFET_FIRE (byte Number)
   }
 }
 
-
 void toLog (String message)
 {
 
@@ -489,7 +455,6 @@ void toLog (String message)
     EEPOS = EEPOS + eventSize;
     NumRec = EEPOS / eventSize;
     EEPROM.write(947, NumRec);
-
   }
 }
 
@@ -510,9 +475,6 @@ void fromLog ()
     Serial.println("-----------------------------------------------");
   }
 }
-
-
-
 
 
 void getInfo2()
@@ -565,14 +527,12 @@ void getInfo2()
     Temperature   = telemetry.Temperature;
     Altitude      = telemetry.Altitude;
     Speed         = telemetry.Speed;
-    float Speed2  =  Speed;
-
 
     Serial.print (EEXPos);
     Serial.print("\t");
     Serial.print (Altitude);
     Serial.print("\t");
-    Serial.print (Speed2);
+    Serial.print (Speed);
     Serial.print("\t");
     Serial.print (Pressure);
     Serial.print("\t");
@@ -597,11 +557,8 @@ void getInfo2()
 }
 
 
-
-
 void LANDING_PROCEDURE ()
 {
-
   toLog ("LANDING_PROCEDURE (" + String(telemetry.Altitude) + ")");
   MOSFET_FIRE (1);
 }
@@ -617,7 +574,7 @@ float speedOmeter()
 
   FirstTimeM = millis();
 
-  if (FirstTimeM - SecondTimeM >= 500)
+  if (FirstTimeM - SecondTimeM > 100)
   {
 
     FloatSpeed = (Alt2 - Alt1) / (FirstTimeM - SecondTimeM) * 100000;
@@ -631,7 +588,6 @@ float speedOmeter()
     }
   }
   return Speed;
-
 }
 
 void LOGonOSD()
