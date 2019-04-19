@@ -36,12 +36,9 @@ long int Pressure;
 boolean writeit;
 boolean powerLost;
 int PackSize;
-int bx, by, bz;
-int bax, bay, baz;
-float cx1, cy1, cz1;
-double xyz[3];
-double ax, ay, az;
-int x, y, z;
+float fbx, fby, fbz;
+float fbax, fbay, fbaz;
+float SpeedDim [3];
 
 int bufwrite;
 int msgCount;
@@ -67,8 +64,8 @@ byte command;
 
 struct telemetrystruct
 {
-  int bax, bay, baz;
-  int bx, by, bz;
+  float fbax, fbay, fbaz;
+  float fbx, fby, fbz;
   long int Pressure;
   int Temperature;
   float Altitude;
@@ -147,12 +144,13 @@ float speedOmeter()
 {
   Alt2 = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
+
   FirstTimeM = millis();
 
-  if (FirstTimeM - SecondTimeM > 100)
+  if (FirstTimeM - SecondTimeM > 99)
   {
 
-    Speed = (Alt2 - Alt1) / (FirstTimeM - SecondTimeM) * 1000;
+    Speed = (round(Alt2) - round(Alt1)) / (FirstTimeM - SecondTimeM) * 1000;
 
     Alt1 = Alt2;
     SecondTimeM = millis();
@@ -210,20 +208,10 @@ void getdata()
 
   IMU.readSensor();
 
-  cx1 = IMU.getAccelX_mss();
-  cy1 = IMU.getAccelY_mss();
-  cz1 = IMU.getAccelZ_mss();
-
-  cx1 = cx1 * 10;
-  cy1 = cy1 * 10;
-  cz1 = cz1 * 10;
-
-  bx = cx1;
-  by = cy1;
-  bz = cz1;
-
-  float fbax, fbay, fbaz;
-
+  fbx = IMU.getAccelX_mss();
+  fby = IMU.getAccelY_mss();
+  fbz = IMU.getAccelZ_mss();
+  
   fbax = IMU.getGyroX_rads();
   fbay = IMU.getGyroY_rads();
   fbaz = IMU.getGyroZ_rads();
@@ -232,9 +220,6 @@ void getdata()
   fbay = fbay * 57.2958;
   fbaz = fbaz * 57.2958;
 
-  bax = fbax;
-  bay = fbay;
-  baz = fbaz;
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -243,19 +228,19 @@ void getdata()
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   Pressure = bme.readPressure();
 
-  Altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
+  Altitude = round(bme.readAltitude(SEALEVELPRESSURE_HPA));
 
   Temperature = bme.readTemperature();
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-  telemetry.bx = bx;
-  telemetry.by = by;
-  telemetry.bz = bz;
+  telemetry.fbx = fbx;
+  telemetry.fby = fby;
+  telemetry.fbz = fbz;
 
-  telemetry.bax = bax;
-  telemetry.bay = bay;
-  telemetry.baz = baz;
+  telemetry.fbax = fbax;
+  telemetry.fbay = fbay;
+  telemetry.fbaz = fbaz;
 
   telemetry.Pressure = Pressure;
   telemetry.Temperature = Temperature;
@@ -371,7 +356,7 @@ void getInfo2()
   PackSize = sizeof(telemetry);
   byte Packet[PackSize];
 
-  Serial.println("EEXPos\t Alt\t Spd\t Prs\t Tmp\t bx\t by\t bz\t gX\t gY\t gZ");
+  Serial.println("  Alt\t Spd\t Prs\t Tmp\t fbx\t fby\t fbz\t gX\t gY\t gZ");
   Serial.println(" ");
 
   for (int Rec = 0; Rec < Cycles; Rec++)
@@ -383,29 +368,20 @@ void getInfo2()
 
     memcpy(&telemetry, Packet, sizeof(telemetry));
 
-    bx = telemetry.bx;
-    by = telemetry.by;
-    bz = telemetry.bz;
+    fbx = telemetry.fbx;
+    fby = telemetry.fby;
+    fbz = telemetry.fbz;
 
-    float DT_bx = bx;
-    float DT_by = by;
-    float DT_bz = bz;
-
-    DT_bx = DT_bx / 10;
-    DT_by = DT_by / 10;
-    DT_bz = DT_bz / 10;
-
-    bax = telemetry.bax;
-    bay = telemetry.bay;
-    baz = telemetry.baz;
+    
+    fbax = telemetry.fbax;
+    fbay = telemetry.fbay;
+    fbaz = telemetry.fbaz;
 
     Pressure = telemetry.Pressure;
     Temperature = telemetry.Temperature;
     Altitude = telemetry.Altitude;
     Speed = telemetry.Speed;
 
-    Serial.print(EEXPos);
-    Serial.print("\t");
     Serial.print(Altitude);
     Serial.print("\t");
     Serial.print(Speed);
@@ -414,22 +390,21 @@ void getInfo2()
     Serial.print("\t");
     Serial.print(Temperature);
     Serial.print("\t");
-    Serial.print(DT_bx, 2);
+    Serial.print(fbx, 2);
     Serial.print("\t");
-    Serial.print(DT_by, 2);
+    Serial.print(fby, 2);
     Serial.print("\t");
-    Serial.print(DT_bz, 2);
+    Serial.print(fbz, 2);
     Serial.print("\t");
-    Serial.print(round(bax));
+    Serial.print(fbax,2);
     Serial.print("\t");
-    Serial.print(round(bay));
+    Serial.print(fbay,2);
     Serial.print("\t");
-    Serial.println(round(baz));
+    Serial.println(fbaz, 2);
 
     EEXPos = EEXPos + PackSize;
   }
-  Serial.println("-----------------------------------------------------");
-  Serial.println(EEXPos);
+  Serial.println("-------------------------------------------------------------------------------------");
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -570,10 +545,7 @@ void loop()
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                         Тут у нас будет часть про ожидание пуска                              //
   ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-  Serial.print("PackSize:");
-  Serial.println(PackSize);
-
+ 
   disp.clear();
   disp.displayInt(bme.readAltitude(SEALEVELPRESSURE_HPA));
   delay(1000);
