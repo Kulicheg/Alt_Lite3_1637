@@ -43,19 +43,20 @@ float SpeedDim [3];
 int bufwrite;
 int msgCount;
 int Cycles;
-boolean Fallen;
+bool Fallen;
 byte NumRec;
 int xCal, yCal, zCal, axCal, ayCal, azCal;
 long int Start, Start2, Finish, Finish2, routineTime;
 long int FirstTime, SecondTime, oldAltitude, newAltitude, SecondTimeM, FirstTimeM;
 byte MOSFET_1, MOSFET_2, MOSFET_3;
-boolean MOSFET_1_IS_FIRED, MOSFET_2_IS_FIRED, MOSFET_3_IS_FIRED;
+bool MOSFET_1_IS_FIRED, MOSFET_2_IS_FIRED, MOSFET_3_IS_FIRED;
 
 int Maxspeed;
 float Altitude;
 int Apogee;
 int Temperature;
 float Speed;
+int SpeedAvg;
 
 byte JournalSize;
 byte currentByte;
@@ -70,6 +71,7 @@ struct telemetrystruct
   int Temperature;
   float Altitude;
   float Speed;
+  int SpeedAvg;
 };
 
 struct SystemLog
@@ -145,15 +147,24 @@ float speedOmeter()
   Alt2 = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
 
+
   FirstTimeM = millis();
 
-  if (FirstTimeM - SecondTimeM > 99)
+  if (FirstTimeM - SecondTimeM > 98)
   {
 
-    Speed = (round(Alt2) - round(Alt1)) / (FirstTimeM - SecondTimeM) * 1000;
+    Speed = (Alt2 - Alt1) / (FirstTimeM - SecondTimeM) * 1000;
 
     Alt1 = Alt2;
     SecondTimeM = millis();
+
+ for (int q = 0; q<2; q++)
+{
+  SpeedDim [q] = SpeedDim[q+1];
+ }
+SpeedDim[2] = Speed;
+
+SpeedAvg = round((SpeedDim[0] + SpeedDim[1] + SpeedDim[2]) / 3);
 
     if (Speed > Maxspeed)
     {
@@ -246,6 +257,8 @@ void getdata()
   telemetry.Temperature = Temperature;
   telemetry.Altitude = Altitude;
   telemetry.Speed = speedOmeter();
+  telemetry.SpeedAvg = SpeedAvg;
+
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 }
@@ -356,7 +369,7 @@ void getInfo2()
   PackSize = sizeof(telemetry);
   byte Packet[PackSize];
 
-  Serial.println("  Alt\t Spd\t Prs\t Tmp\t fbx\t fby\t fbz\t gX\t gY\t gZ");
+  Serial.println("  Alt\t Spd\t Prs\t Tmp\t fbx\t fby\t fbz\t gX\t gY\t gZ \t Vavg");
   Serial.println(" ");
 
   for (int Rec = 0; Rec < Cycles; Rec++)
@@ -381,10 +394,11 @@ void getInfo2()
     Temperature = telemetry.Temperature;
     Altitude = telemetry.Altitude;
     Speed = telemetry.Speed;
+    SpeedAvg = telemetry.SpeedAvg;
 
-    Serial.print(Altitude);
+    Serial.print(round(Altitude));
     Serial.print("\t");
-    Serial.print(Speed);
+    Serial.print(round(Speed));
     Serial.print("\t");
     Serial.print(Pressure);
     Serial.print("\t");
@@ -396,11 +410,13 @@ void getInfo2()
     Serial.print("\t");
     Serial.print(fbz, 2);
     Serial.print("\t");
-    Serial.print(fbax,2);
+    Serial.print(round(fbax));
     Serial.print("\t");
-    Serial.print(fbay,2);
+    Serial.print(round(fbay));
     Serial.print("\t");
-    Serial.println(fbaz, 2);
+    Serial.println(round(fbaz));
+    Serial.print("\t");
+    Serial.println(SpeedAvg);
 
     EEXPos = EEXPos + PackSize;
   }
@@ -608,8 +624,6 @@ void loop()
   toLog("Maximum Speed " + String(Maxspeed));
 
   toLog("Finish Logging");
-
-
 
   getInfo2();
   fromLog();
