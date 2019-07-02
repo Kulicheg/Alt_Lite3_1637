@@ -1,6 +1,5 @@
 //I2C device found at address 0x3C !  OLED
 //I2C device found at address 0x50 !  EEPROM
-//I2C device found at address 0x58 !  EEPROM
 //I2C device found at address 0x68 !  AXL
 //I2C device found at address 0x76 !  BMP
 // 950 - 953 - Max Speed
@@ -20,7 +19,7 @@
 #define CLK 12
 #define DIO 11
 #define BUTTON 13
-#define BUZZER 14
+#define BUZZER 15
 
 
 Adafruit_BMP280 bme;
@@ -113,8 +112,10 @@ void setup()
   pinMode(MOSFET_1, OUTPUT);      //MOSFET#1
   pinMode(MOSFET_2, OUTPUT);      //MOSFET#2
   pinMode(MOSFET_3, OUTPUT);      //MOSFET#3
-  pinMode(LED_BUILTIN, OUTPUT);   //LED#13
-  pinMode(BUTTON, INPUT_PULLUP); // BUTTON PIN
+  pinMode(BUTTON, INPUT_PULLUP); //BUTTON PIN
+  pinMode(BUZZER, OUTPUT);      //BUZZER
+
+  beeper (250);
 
   Serial.begin(115200);
   Wire.begin();
@@ -151,13 +152,12 @@ void setup()
       while (1) {}
     }
   }
-  delay(500);
+
+  beeper (250);
 
   byte welcome_banner[] = {_H, _E, _L, _L, _O, _empty, _empty,};
   disp.clear();
   disp.runningString(welcome_banner, sizeof(welcome_banner), 200);
-
-
 
   SEALEVELPRESSURE_HPA = bme.readPressure() / 100.0;
 
@@ -189,7 +189,6 @@ void loop()
   disp.clear();
   disp.displayInt(bme.readPressure() * 0.00750062);
   delay (1000);
-
   Serial.print("PackSize:");
   Serial.println(PackSize);
 
@@ -206,16 +205,21 @@ void loop()
   disp.clear();
   disp.displayByte(_F, _L, _Y, _empty);
   Serial.println("POEKHALI!");
-  delay (2000);
+  beeper (2000);
 
-  EEXPos = 0;
+ 
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                                     FIRST STAGE                                               //
   ///////////////////////////////////////////////////////////////////////////////////////////////////
+  EEXPos = 0;
   Maxspeed = 0;
+  Apogee = 0;
   toLog ("Start Logging");
   disp.clear();
+
+  EEPROM.put (945, Apogee);
+  EEPROM.put (950, Maxspeed);
 
 
   for (int FSTage = 1; FSTage <= Cycles; FSTage++)
@@ -226,9 +230,6 @@ void loop()
     Writelog();       // Пишем данные в EEPROM
     fallingSense ();  // Не падаем ли?
 
-    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-    tone (BUZZER, 200, 3);
-
     if (Fallen and !MOSFET_1_IS_FIRED)
 
     {
@@ -236,7 +237,7 @@ void loop()
     }
 
 
-    delay(90);
+    delay(91);
     Finish2 = millis();
     routineTime = Finish2 - Start2;
     disp.displayInt(routineTime);
@@ -245,7 +246,6 @@ void loop()
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                                     PRAYING FOR RECOVERY                                      //
   ///////////////////////////////////////////////////////////////////////////////////////////////////
-
 
   toLog ("Finish Logging");
 
@@ -258,28 +258,17 @@ void loop()
   disp.clear();
   disp.displayInt(Apogee);
 
-
-
   while (1)
   {
-    tone (BUZZER, 1800, 1000);
-    delay (1000);
-    tone (BUZZER, 2200, 1000);
-    delay (1000);
-
+    beeper  (1000);
+    delay   (1000);
+    beeper  (1000);
+    delay   (1000);
 
     if (!digitalRead(BUTTON))   break;
-
   }
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-
 
 
 void Writelog()
@@ -404,11 +393,10 @@ void MOSFET_FIRE (byte Number)
   {
     case 1:
       disp.clear();
-      tone (BUZZER, 500, 10);
       digitalWrite(MOSFET_1, HIGH);
       delay(250);
       digitalWrite(MOSFET_1, LOW);
-
+      beeper (25);
       MOSFET_1_IS_FIRED = true;
 
       toLog ("MOSFET_1 IS FIRED");
@@ -417,11 +405,10 @@ void MOSFET_FIRE (byte Number)
 
     case 2:
       disp.clear();
-      tone (BUZZER, 700, 10);
       digitalWrite(MOSFET_2, HIGH);
       delay(250);
       digitalWrite(MOSFET_2, LOW);
-
+      beeper (25);
       MOSFET_2_IS_FIRED = true;
 
       toLog ("MOSFET_2 IS FIRED");
@@ -429,11 +416,10 @@ void MOSFET_FIRE (byte Number)
 
     case 3:
       disp.clear();
-      tone (BUZZER, 900, 10);
       digitalWrite(MOSFET_3, HIGH);
       delay(250);
       digitalWrite(MOSFET_3, LOW);
-
+      beeper (25);
       MOSFET_3_IS_FIRED = true;
 
       toLog ("MOSFET_3 IS FIRED");
@@ -492,7 +478,7 @@ void getInfo2()
   byte Packet[PackSize];
 
 
-  Serial.println ("EEXPos\t Alt\t Spd\t Prs\t Tmp\t bx\t by\t bz\t gX\t gY\t gZ");
+  Serial.println ("  Alt\t Spd\t Prs\t Tmp\t bx\t by\t bz\t gX\t gY\t gZ");
   Serial.println (" ");
 
   for (int Rec = 0; Rec < Cycles; Rec++)
@@ -528,8 +514,7 @@ void getInfo2()
     Altitude      = telemetry.Altitude;
     Speed         = telemetry.Speed;
 
-    Serial.print (EEXPos);
-    Serial.print("\t");
+
     Serial.print (Altitude);
     Serial.print("\t");
     Serial.print (Speed);
@@ -592,14 +577,14 @@ float speedOmeter()
 
 void LOGonOSD()
 {
-  tone (BUZZER, 300, 5);
+  beeper (10);
   EEPROM.get (945, Apogee);
   EEPROM.get (950, Maxspeed);
 
   disp.clear();
   disp.displayInt(Apogee);
   delay (6000);
-  tone (BUZZER, 300, 5);
+  beeper (10);
   disp.clear();
   disp.displayInt(Maxspeed);
   delay (6000);
@@ -624,7 +609,6 @@ void SendData()
 
 
   /////////////////////////////////////SEND CYCLES////////////////////////////////////////////////
-  //tone (3, 1000, 5);
   for ( int q = 0; q < Cycles * PackSize; q++)
   {
     byte Sendbyte = driveD.read (q);
@@ -635,7 +619,6 @@ void SendData()
   ////////////////////////////////////////////////////////////////////////////////////////////////
 
   /////////////////////////////////////SEND JOURNAL///////////////////////////////////////////////
-  //tone (3, 1000, 5);
   for ( int q = 0; q < NumRec * JournalSize; q++)
   {
     byte Sendbyte = EEPROM.read (q);
@@ -644,7 +627,6 @@ void SendData()
   Serial.flush();
   delay (200);
   /////////////////////////////////////SEND DUMP////////////////////////////////////////////////
-  //tone (3, 1000, 5);
   for ( int q = 945; q < 1024 ; q++)
   {
     byte Sendbyte = EEPROM.read (q);
@@ -652,7 +634,6 @@ void SendData()
   }
   Serial.flush();
   ////////////////////////////////////////////////////////////////////////////////////////////////
-  //tone (3, 500, 5);
 }
 
 void sendheader(byte command)
@@ -662,4 +643,12 @@ void sendheader(byte command)
     Serial.write (header[q]);
   }
   Serial.write (command);
+}
+
+
+void beeper (int milsec)
+{
+  digitalWrite(BUZZER, HIGH);
+  delay (milsec);
+  digitalWrite(BUZZER, LOW);
 }
