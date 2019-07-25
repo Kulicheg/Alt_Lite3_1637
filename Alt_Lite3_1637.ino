@@ -1,4 +1,4 @@
-//I2C device found at address 0x3C !  OLED
+ //I2C device found at address 0x3C !  OLED
 //I2C device found at address 0x50 !  EEPROM
 //I2C device found at address 0x68 !  AXL
 //I2C device found at address 0x76 !  BMP
@@ -20,8 +20,9 @@
 #define DIO 11
 #define BUTTON 13
 #define BUZZER 15
+
 #define DEBUG_OUT false
-#define DEBUG_MOSFET false
+#define DEBUG_MOSFET true
 
 
 Adafruit_BMP280 bme;
@@ -163,6 +164,7 @@ void setup()
 
   SEALEVELPRESSURE_HPA = bme.readPressure() / 100.0;
 
+
   // setting the accelerometer full scale range to +/-8G
   IMU.setAccelRange(MPU9250::ACCEL_RANGE_8G);
   // setting the gyroscope full scale range to +/-500 deg/s
@@ -171,6 +173,9 @@ void setup()
   IMU.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_20HZ);
   // setting SRD to 19 for a 50 Hz update rate
   IMU.setSrd(19);
+
+  if (DEBUG_MOSFET) test_mosfets();
+
 
 }
 //------------------------------------------------------------------------------
@@ -209,7 +214,7 @@ void loop()
   Serial.println("POEKHALI!");
   beeper (2000);
 
- 
+
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                                     FIRST STAGE                                               //
@@ -654,3 +659,23 @@ void beeper (int milsec)
   delay (milsec);
   digitalWrite(BUZZER, LOW);
 }
+
+void test_mosfets()
+{
+  disp.clear();
+  disp.displayInt(0001);
+  MOSFET_FIRE (1);
+  delay (2000);
+  disp.clear();
+  disp.displayInt(0002);
+  MOSFET_FIRE (2);
+  delay (2000);
+  disp.clear();
+  disp.displayInt(0003);
+  delay (2000);
+  MOSFET_FIRE (3);
+  delay (2000);
+  disp.clear();
+  disp.displayInt(0000);
+}
+
