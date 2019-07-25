@@ -20,6 +20,8 @@
 #define DIO 11
 #define BUTTON 13
 #define BUZZER 15
+#define DEBUG_OUT false
+#define DEBUG_MOSFET false
 
 
 Adafruit_BMP280 bme;
