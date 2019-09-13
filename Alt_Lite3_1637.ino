@@ -1,4 +1,6 @@
- //I2C device found at address 0x3C !  OLED
+#include <Arduino.h> // for platformIO
+
+//I2C device found at address 0x3C !  OLED
 //I2C device found at address 0x50 !  EEPROM
 //I2C device found at address 0x68 !  AXL
 //I2C device found at address 0x76 !  BMP
@@ -21,8 +23,14 @@
 #define BUTTON 13
 #define BUZZER 15
 
-#define DEBUG_OUT false
-#define DEBUG_MOSFET true
+#define MOSFET1 10
+#define MOSFET2 9
+#define MOSFET3 0
+
+#define DEBUG_OUT true
+#define DEBUG_MOSFET false
+
+#define Cycles 600
 
 
 Adafruit_BMP280 bme;
@@ -30,9 +38,8 @@ FM24C256 driveD(0x50);
 MPU9250 IMU(Wire, 0x68);
 GyverTM1637 disp(CLK, DIO);
 
-
 float SEALEVELPRESSURE_HPA;
-int EEPOS  = 0;
+int EEPOS = 0;
 int EEXPos;
 float Alt1, Alt2;
 long int Pressure;
@@ -48,13 +55,11 @@ int x, y, z;
 
 int bufwrite;
 int msgCount;
-int Cycles;
 boolean Fallen;
 byte NumRec;
 int xCal, yCal, zCal, axCal, ayCal, azCal;
 long int Start, Start2, Finish, Finish2, routineTime;
 long int FirstTime, SecondTime, oldAltitude, newAltitude, SecondTimeM, FirstTimeM;
-byte MOSFET_1, MOSFET_2, MOSFET_3;
 boolean MOSFET_1_IS_FIRED, MOSFET_2_IS_FIRED, MOSFET_3_IS_FIRED;
 
 int Maxspeed;
@@ -65,9 +70,9 @@ float Speed;
 
 byte JournalSize;
 byte currentByte;
-byte header [4] = {170, 171, 186, 187};
+byte header[4] = {170, 171, 186, 187};
 byte command;
-
+unsigned long millisshift;
 
 struct telemetrystruct
 {
@@ -76,7 +81,7 @@ struct telemetrystruct
   long int Pressure;
   int Temperature;
   float Altitude;
-  float  Speed;
+  float Speed;
 };
 
 struct SystemLog
@@ -88,204 +93,62 @@ struct SystemLog
 struct telemetrystruct telemetry;
 struct SystemLog capitansLog;
 
+void beeper(int milsec)
+{
+  digitalWrite(BUZZER, HIGH);
+  delay(milsec);
+  digitalWrite(BUZZER, LOW);
+}
 
-void setup()
+float speedOmeter()
 {
 
-  MOSFET_1_IS_FIRED = false;
-  MOSFET_2_IS_FIRED = false;
-  MOSFET_3_IS_FIRED = false;
+  float FloatSpeed;
+  Alt2 = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
-  MOSFET_1 = 15;
-  MOSFET_2 = 16;
-  MOSFET_3 = 17;
+  FirstTimeM = millis();
 
-  Fallen = false;
-  Cycles = 600;
-  Apogee = 0;
-  Maxspeed = 0;
-
-  JournalSize = sizeof (capitansLog);
-  PackSize = sizeof (telemetry);
-
-  disp.clear();
-  disp.brightness(7);  // яркость, 0 - 7 (минимум - максимум)
-
-
-  pinMode(MOSFET_1, OUTPUT);      //MOSFET#1
-  pinMode(MOSFET_2, OUTPUT);      //MOSFET#2
-  pinMode(MOSFET_3, OUTPUT);      //MOSFET#3
-  pinMode(BUTTON, INPUT_PULLUP); //BUTTON PIN
-  pinMode(BUZZER, OUTPUT);      //BUZZER
-
-  beeper (250);
-
-  Serial.begin(115200);
-  Wire.begin();
-
-
-  if (!bme.begin()) {
-    disp.clear();
-    disp.displayInt(280);
-    Serial.println("BMP280 NOT FOUND!");
-    while (1) {}
-  }
-
-  int status = IMU.begin();
-  if (status < 0) {
-    Serial.println("IMU NOT FOUND!");
-    Serial.print("Status:");
-    Serial.println(status);
-    disp.clear();
-    disp.displayInt(9250);
-    while (1) {}
-  }
-
-
-  for (int q = 0; q < 16; q++)
+  if (FirstTimeM - SecondTimeM > 100)
   {
-    byte testbyte = random(255);
-    driveD.write(32000 + q, testbyte);
 
-    if (driveD.read(32000 + q) != testbyte )
+    FloatSpeed = (Alt2 - Alt1) / (FirstTimeM - SecondTimeM) * 100000;
+
+    Speed = FloatSpeed / 100;
+    Alt1 = Alt2;
+    SecondTimeM = millis();
+
+    if (Speed > Maxspeed)
     {
-      Serial.println("EXTERNAL EEPROM ERROR!");
-      disp.clear();
-      disp.displayInt(9999);
-      while (1) {}
+      Maxspeed = Speed;
     }
   }
-
-  beeper (250);
-
-  byte welcome_banner[] = {_H, _E, _L, _L, _O, _empty, _empty,};
-  disp.clear();
-  disp.runningString(welcome_banner, sizeof(welcome_banner), 200);
-
-  SEALEVELPRESSURE_HPA = bme.readPressure() / 100.0;
-
-
-  // setting the accelerometer full scale range to +/-8G
-  IMU.setAccelRange(MPU9250::ACCEL_RANGE_8G);
-  // setting the gyroscope full scale range to +/-500 deg/s
-  IMU.setGyroRange(MPU9250::GYRO_RANGE_500DPS);
-  // setting DLPF bandwidth to 20 Hz
-  IMU.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_20HZ);
-  // setting SRD to 19 for a 50 Hz update rate
-  IMU.setSrd(19);
-
-  if (DEBUG_MOSFET) test_mosfets();
-
-
+  return Speed;
 }
-//------------------------------------------------------------------------------
-void loop()
+
+void toLog(String message)
 {
-  if (!digitalRead(BUTTON))
+
+  if (EEPOS < 928)
   {
-    LOGonOSD();
-  }
-
-  ///////////////////////////////////////////////////////////////////////////////////////////////////
-  //                         Тут у нас будет часть про ожидание пуска                              //
-  ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-  disp.clear();
-  disp.displayInt(bme.readAltitude(SEALEVELPRESSURE_HPA));
-  delay (1000);
-  disp.clear();
-  disp.displayInt(bme.readPressure() * 0.00750062);
-  delay (1000);
-  Serial.print("PackSize:");
-  Serial.println(PackSize);
-
-  while (digitalRead(BUTTON))
-  {
-    disp.clear();
-    disp.displayByte(_S, _E, _N, _D);
-
-    getInfo2();
-    fromLog();
-    delay(2000);
-  }
-
-  disp.clear();
-  disp.displayByte(_F, _L, _Y, _empty);
-  Serial.println("POEKHALI!");
-  beeper (2000);
-
-
-
-  ///////////////////////////////////////////////////////////////////////////////////////////////////
-  //                                     FIRST STAGE                                               //
-  ///////////////////////////////////////////////////////////////////////////////////////////////////
-  EEXPos = 0;
-  Maxspeed = 0;
-  Apogee = 0;
-  toLog ("Start Logging");
-  disp.clear();
-
-  EEPROM.put (945, Apogee);
-  EEPROM.put (950, Maxspeed);
-
-
-  for (int FSTage = 1; FSTage <= Cycles; FSTage++)
-  {
-    Start2 = millis();
-
-    getdata();        // Получаем данные с датчиков в структуру
-    Writelog();       // Пишем данные в EEPROM
-    fallingSense ();  // Не падаем ли?
-
-    if (Fallen and !MOSFET_1_IS_FIRED)
-
-    {
-      LANDING_PROCEDURE();
-    }
-
-
-    delay(91);
-    Finish2 = millis();
-    routineTime = Finish2 - Start2;
-    disp.displayInt(routineTime);
-  }
-
-  ///////////////////////////////////////////////////////////////////////////////////////////////////
-  //                                     PRAYING FOR RECOVERY                                      //
-  ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-  toLog ("Finish Logging");
-
-  EEPROM.put(950, Maxspeed);
-  toLog ("Maximum Speed " + String (Maxspeed));
-
-  getInfo2();
-  fromLog();
-
-  disp.clear();
-  disp.displayInt(Apogee);
-
-  while (1)
-  {
-    beeper  (1000);
-    delay   (1000);
-    beeper  (1000);
-    delay   (1000);
-
-    if (!digitalRead(BUTTON))   break;
+    int eventSize = sizeof(capitansLog);
+    char event[25];
+    message.toCharArray(event, 25);
+    memcpy(capitansLog.message, event, 25);
+    capitansLog.timestamp = millis() - millisshift;
+    EEPROM.put(EEPOS, capitansLog);
+    EEPOS = EEPOS + eventSize;
+    NumRec = EEPOS / eventSize;
+    EEPROM.write(947, NumRec);
   }
 }
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 void Writelog()
 {
-
   if (EEXPos < 32500)
   {
-    unsigned char * telemetry_bytes;
+    unsigned char *telemetry_bytes;
 
-    telemetry_bytes = (unsigned char *) &telemetry;
+    telemetry_bytes = (unsigned char *)&telemetry;
 
     for (bufwrite = 0; bufwrite < PackSize; bufwrite++)
     {
@@ -311,11 +174,9 @@ void getdata()
   cy1 = cy1 * 10;
   cz1 = cz1 * 10;
 
-
   bx = cx1;
   by = cy1;
   bz = cz1;
-
 
   float fbax, fbay, fbaz;
 
@@ -327,19 +188,16 @@ void getdata()
   fbay = fbay * 57.2958;
   fbaz = fbaz * 57.2958;
 
-
   bax = fbax;
   bay = fbay;
   baz = fbaz;
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                                     OTHER SENSORS COLLECTION                                  //
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   Pressure = bme.readPressure();
-
 
   Altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
@@ -351,34 +209,34 @@ void getdata()
   telemetry.by = by;
   telemetry.bz = bz;
 
-
   telemetry.bax = bax;
   telemetry.bay = bay;
   telemetry.baz = baz;
 
-  telemetry.Pressure    = Pressure;
+  telemetry.Pressure = Pressure;
   telemetry.Temperature = Temperature;
-  telemetry.Altitude    = Altitude;
-  telemetry.Speed       = speedOmeter();
-
+  telemetry.Altitude = Altitude;
+  telemetry.Speed = speedOmeter();
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
-void fallingSense ()
+void fallingSense()
 {
-  if (!Fallen) {
+  if (!Fallen)
+  {
 
-    if (Speed < 5 and Altitude > 30)
+    if (Speed < 4 and Altitude > 30)
     {
       Fallen = true;
-      toLog ("LOW Speed!A=" + String(Altitude) + "S=" + String(Speed));
+      toLog("LOW Spd A=" + String(Altitude) + "S=" + String(Speed));
+      Apogee = Altitude;
     }
 
     if ((oldAltitude - newAltitude) > 2)
     {
       Apogee = oldAltitude;
-      toLog ("Falling detected " + String(Apogee));
+      toLog("Falling detected " + String(Apogee));
       EEPROM.put(945, Apogee);
       Fallen = true;
     }
@@ -393,72 +251,53 @@ void fallingSense ()
   }
 }
 
-
-void MOSFET_FIRE (byte Number)
+void MOSFET_FIRE(byte Number)
 {
   switch (Number)
   {
-    case 1:
-      disp.clear();
-      digitalWrite(MOSFET_1, HIGH);
-      delay(250);
-      digitalWrite(MOSFET_1, LOW);
-      beeper (25);
-      MOSFET_1_IS_FIRED = true;
+  case 1:
+    disp.clear();
+    //disp.displayInt(8888);
+    digitalWrite(MOSFET1, HIGH);
+    beeper(300);
+    digitalWrite(MOSFET1, LOW);
+    MOSFET_1_IS_FIRED = true;
+    toLog("MOSFET_1 IS FIRED");
+    disp.clear();
+    break;
 
-      toLog ("MOSFET_1 IS FIRED");
+  case 2:
+    disp.clear();
+    //disp.displayInt(8888);
+    digitalWrite(MOSFET2, HIGH);
+    beeper(300);
+    digitalWrite(MOSFET2, LOW);
+    MOSFET_2_IS_FIRED = true;
+    toLog("MOSFET_2 IS FIRED");
+    disp.clear();
+    break;
 
-      break;
-
-    case 2:
-      disp.clear();
-      digitalWrite(MOSFET_2, HIGH);
-      delay(250);
-      digitalWrite(MOSFET_2, LOW);
-      beeper (25);
-      MOSFET_2_IS_FIRED = true;
-
-      toLog ("MOSFET_2 IS FIRED");
-      break;
-
-    case 3:
-      disp.clear();
-      digitalWrite(MOSFET_3, HIGH);
-      delay(250);
-      digitalWrite(MOSFET_3, LOW);
-      beeper (25);
-      MOSFET_3_IS_FIRED = true;
-
-      toLog ("MOSFET_3 IS FIRED");
-      break;
+  case 3:
+    disp.clear();
+    //disp.displayInt(8888);
+    digitalWrite(MOSFET3, HIGH);
+    beeper(300);
+    digitalWrite(MOSFET3, LOW);
+    MOSFET_3_IS_FIRED = true;
+    toLog("MOSFET_3 IS FIRED");
+    disp.clear();
+    break;
   }
 }
 
-void toLog (String message)
-{
-
-  if (EEPOS < 928)
-  {
-    int eventSize = sizeof (capitansLog);
-    char event [25];
-    message.toCharArray (event, 25);
-    memcpy(capitansLog.message, event, 25);
-    capitansLog.timestamp = millis();
-    EEPROM.put(EEPOS, capitansLog);
-    EEPOS = EEPOS + eventSize;
-    NumRec = EEPOS / eventSize;
-    EEPROM.write(947, NumRec);
-  }
-}
-
-void fromLog ()
+void fromLog()
 {
   Serial.println("-----------------------------------------------");
-  int eventSize = sizeof (capitansLog);
+  int eventSize = sizeof(capitansLog);
 
   NumRec = EEPROM.read(947);
 
-  for (int msgCount = 0; msgCount < (eventSize * NumRec);  msgCount = msgCount + eventSize)
+  for (int msgCount = 0; msgCount < (eventSize * NumRec); msgCount = msgCount + eventSize)
   {
     EEPROM.get(msgCount, capitansLog);
     String str(capitansLog.message);
@@ -469,24 +308,22 @@ void fromLog ()
   }
 }
 
-
 void getInfo2()
 {
   EEXPos = 0;
-  EEPROM.get (945, Apogee);
-  Serial.print ("Apogee = ");
-  Serial.println (Apogee);
+  EEPROM.get(945, Apogee);
+  Serial.print("Apogee = ");
+  Serial.println(Apogee);
 
-  EEPROM.get (950, Maxspeed);
-  Serial.print ("Max Speed = ");
-  Serial.println (Maxspeed);
+  EEPROM.get(950, Maxspeed);
+  Serial.print("Max Speed = ");
+  Serial.println(Maxspeed);
 
-  PackSize = sizeof (telemetry);
+  PackSize = sizeof(telemetry);
   byte Packet[PackSize];
 
-
-  Serial.println ("  Alt\t Spd\t Prs\t Tmp\t bx\t by\t bz\t gX\t gY\t gZ");
-  Serial.println (" ");
+  Serial.println("  Alt\t Spd\t Prs\t Tmp\t bx\t by\t bz\t gX\t gY\t gZ");
+  Serial.println(" ");
 
   for (int Rec = 0; Rec < Cycles; Rec++)
   {
@@ -497,10 +334,9 @@ void getInfo2()
 
     memcpy(&telemetry, Packet, sizeof(telemetry));
 
-
-    bx            =  telemetry.bx;
-    by            =  telemetry.by;
-    bz            =  telemetry.bz;
+    bx = telemetry.bx;
+    by = telemetry.by;
+    bz = telemetry.bz;
 
     float DT_bx = bx;
     float DT_by = by;
@@ -510,172 +346,338 @@ void getInfo2()
     DT_by = DT_by / 10;
     DT_bz = DT_bz / 10;
 
+    bax = telemetry.bax;
+    bay = telemetry.bay;
+    baz = telemetry.baz;
 
-    bax           = telemetry.bax;
-    bay           = telemetry.bay;
-    baz           = telemetry.baz;
+    Pressure = telemetry.Pressure;
+    Temperature = telemetry.Temperature;
+    Altitude = telemetry.Altitude;
+    Speed = telemetry.Speed;
 
-
-    Pressure      = telemetry.Pressure;
-    Temperature   = telemetry.Temperature;
-    Altitude      = telemetry.Altitude;
-    Speed         = telemetry.Speed;
-
-
-    Serial.print (Altitude);
+    Serial.print(Altitude);
     Serial.print("\t");
-    Serial.print (Speed);
+    Serial.print(Speed);
     Serial.print("\t");
-    Serial.print (Pressure);
+    Serial.print(Pressure);
     Serial.print("\t");
-    Serial.print (Temperature);
+    Serial.print(Temperature);
     Serial.print("\t");
-    Serial.print (DT_bx, 2);
+    Serial.print(DT_bx, 2);
     Serial.print("\t");
-    Serial.print (DT_by, 2);
+    Serial.print(DT_by, 2);
     Serial.print("\t");
-    Serial.print (DT_bz, 2);
+    Serial.print(DT_bz, 2);
     Serial.print("\t");
-    Serial.print (round(bax));
+    Serial.print(round(bax));
     Serial.print("\t");
-    Serial.print (round (bay));
+    Serial.print(round(bay));
     Serial.print("\t");
-    Serial.println (round (baz));
+    Serial.println(round(baz));
 
     EEXPos = EEXPos + PackSize;
   }
-  Serial.println ("-----------------------------------------------------");
-  Serial.println (EEXPos);
+  Serial.println("-----------------------------------------------------");
+  Serial.print(EEXPos);
+  Serial.println(" bytes of data");
 }
 
-
-void LANDING_PROCEDURE ()
+void LANDING_PROCEDURE()
 {
-  toLog ("LANDING_PROCEDURE (" + String(telemetry.Altitude) + ")");
-  MOSFET_FIRE (1);
+  toLog("LANDING_PROCEDURE@" + String(telemetry.Altitude));
+  MOSFET_FIRE(1);
 }
 
-
-
-
-float speedOmeter()
+/* void sendheader(byte command)
 {
-
-  float FloatSpeed;
-  Alt2  =  bme.readAltitude(SEALEVELPRESSURE_HPA);
-
-  FirstTimeM = millis();
-
-  if (FirstTimeM - SecondTimeM > 100)
+  for (byte q = 0; q < 4; q++)
   {
-
-    FloatSpeed = (Alt2 - Alt1) / (FirstTimeM - SecondTimeM) * 100000;
-
-    Speed = FloatSpeed / 100;
-    Alt1 = Alt2;
-    SecondTimeM = millis();
-
-    if (Speed > Maxspeed) {
-      Maxspeed = Speed;
-    }
+    Serial.write(header[q]);
   }
-  return Speed;
-}
-
-void LOGonOSD()
-{
-  beeper (10);
-  EEPROM.get (945, Apogee);
-  EEPROM.get (950, Maxspeed);
-
-  disp.clear();
-  disp.displayInt(Apogee);
-  delay (6000);
-  beeper (10);
-  disp.clear();
-  disp.displayInt(Maxspeed);
-  delay (6000);
-
-  disp.clear();
-  disp.displayInt(433);
-
-  SendData();
+  Serial.write(command);
 }
 
 void SendData()
 {
   sendheader(01);
 
-  Serial.write (NumRec);
-  Serial.write (highByte(Cycles));
-  Serial.write (lowByte(Cycles));
+  Serial.write(NumRec);
+  Serial.write(highByte(Cycles));
+  Serial.write(lowByte(Cycles));
   Serial.flush();
-  delay (200);
+  delay(200);
 
   sendheader(02);
 
-
   /////////////////////////////////////SEND CYCLES////////////////////////////////////////////////
-  for ( int q = 0; q < Cycles * PackSize; q++)
+  for (int q = 0; q < Cycles * PackSize; q++)
   {
-    byte Sendbyte = driveD.read (q);
-    Serial.write (Sendbyte);
+    byte Sendbyte = driveD.read(q);
+    Serial.write(Sendbyte);
   }
   Serial.flush();
-  delay (200);
+  delay(200);
   ////////////////////////////////////////////////////////////////////////////////////////////////
 
   /////////////////////////////////////SEND JOURNAL///////////////////////////////////////////////
-  for ( int q = 0; q < NumRec * JournalSize; q++)
+  for (int q = 0; q < NumRec * JournalSize; q++)
   {
-    byte Sendbyte = EEPROM.read (q);
-    Serial.write (Sendbyte);
+    byte Sendbyte = EEPROM.read(q);
+    Serial.write(Sendbyte);
   }
   Serial.flush();
-  delay (200);
+  delay(200);
   /////////////////////////////////////SEND DUMP////////////////////////////////////////////////
-  for ( int q = 945; q < 1024 ; q++)
+  for (int q = 945; q < 1024; q++)
   {
-    byte Sendbyte = EEPROM.read (q);
-    Serial.write (Sendbyte);
+    byte Sendbyte = EEPROM.read(q);
+    Serial.write(Sendbyte);
   }
   Serial.flush();
   ////////////////////////////////////////////////////////////////////////////////////////////////
-}
+} */
 
-void sendheader(byte command)
+void LOGonOSD()
 {
-  for (byte q = 0; q < 4; q++)
-  {
-    Serial.write (header[q]);
-  }
-  Serial.write (command);
-}
+  beeper(10);
+  EEPROM.get(945, Apogee);
+  EEPROM.get(950, Maxspeed);
 
+  disp.clear();
+  disp.displayInt(Apogee);
+  delay(6000);
+  beeper(10);
+  disp.clear();
+  disp.displayInt(Maxspeed);
+  delay(6000);
 
-void beeper (int milsec)
-{
-  digitalWrite(BUZZER, HIGH);
-  delay (milsec);
-  digitalWrite(BUZZER, LOW);
+  disp.clear();
+  disp.displayInt(433);
+
+  //SendData();
 }
 
 void test_mosfets()
 {
+
   disp.clear();
-  disp.displayInt(0001);
-  MOSFET_FIRE (1);
-  delay (2000);
+  disp.displayInt(1);
+  MOSFET_FIRE(1);
+  delay(2000);
+
   disp.clear();
-  disp.displayInt(0002);
-  MOSFET_FIRE (2);
-  delay (2000);
+  disp.displayInt(2);
+  MOSFET_FIRE(2);
+  delay(2000);
+
   disp.clear();
-  disp.displayInt(0003);
-  delay (2000);
-  MOSFET_FIRE (3);
-  delay (2000);
+  disp.displayInt(3);
+  delay(2000);
+  MOSFET_FIRE(3);
+  delay(2000);
+
   disp.clear();
-  disp.displayInt(0000);
+  disp.displayInt(9999);
+  delay(2000);
+  disp.clear();
 }
 
+void setup()
+{
+
+  MOSFET_1_IS_FIRED = false;
+  MOSFET_2_IS_FIRED = false;
+  MOSFET_3_IS_FIRED = false;
+
+
+
+  Fallen = false;
+  Apogee = 0;
+  Maxspeed = 0;
+
+  JournalSize = sizeof(capitansLog);
+  PackSize = sizeof(telemetry);
+
+  disp.clear();
+  disp.brightness(7); // яркость, 0 - 7 (минимум - максимум)
+
+  pinMode(MOSFET1, OUTPUT);     //MOSFET#1
+  pinMode(MOSFET2, OUTPUT);     //MOSFET#2
+  pinMode(MOSFET3, OUTPUT);     //MOSFET#3
+  pinMode(BUTTON, INPUT_PULLUP); //BUTTON PIN
+  pinMode(BUZZER, OUTPUT);       //BUZZER
+
+  beeper(250);
+
+  Serial.begin(115200);
+  Wire.begin();
+
+  if (!bme.begin())
+  {
+    disp.clear();
+    disp.displayInt(280);
+    Serial.println("BMP280 NOT FOUND!");
+    while (1)
+    {
+    }
+  }
+
+  int status = IMU.begin();
+  if (status < 0)
+  {
+    Serial.println("IMU NOT FOUND!");
+    Serial.print("Status:");
+    Serial.println(status);
+    disp.clear();
+    disp.displayInt(9250);
+    while (1)
+    {
+    }
+  }
+
+  for (int q = 0; q < 16; q++)
+  {
+    byte testbyte = random(255);
+    driveD.write(32000 + q, testbyte);
+
+    if (driveD.read(32000 + q) != testbyte)
+    {
+      Serial.println("EXTERNAL EEPROM ERROR!");
+      disp.clear();
+      disp.displayInt(9999);
+      while (1)
+      {
+      }
+    }
+  }
+
+  beeper(250);
+
+  int8_t welcome_banner[] = {
+      _H,
+      _E,
+      _L,
+      _L,
+      _O,
+      _empty,
+      _empty,
+  };
+  disp.clear();
+  disp.runningString(welcome_banner, sizeof(welcome_banner), 200);
+
+  SEALEVELPRESSURE_HPA = bme.readPressure() / 100.0;
+
+  // setting the accelerometer full scale range to +/-8G
+  IMU.setAccelRange(MPU9250::ACCEL_RANGE_8G);
+  // setting the gyroscope full scale range to +/-500 deg/s
+  IMU.setGyroRange(MPU9250::GYRO_RANGE_500DPS);
+  // setting DLPF bandwidth to 20 Hz
+  IMU.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_20HZ);
+  // setting SRD to 19 for a 50 Hz update rate
+  IMU.setSrd(19);
+
+  if (DEBUG_MOSFET)
+    test_mosfets();
+}
+//------------------------------------------------------------------------------
+void loop()
+{
+  if (!digitalRead(BUTTON))
+  {
+    LOGonOSD();
+  }
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+  //                         Тут у нас будет часть про ожидание пуска                              //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+  disp.clear();
+  disp.displayInt(bme.readAltitude(SEALEVELPRESSURE_HPA));
+  delay(1000);
+  disp.clear();
+  disp.displayInt(bme.readPressure() * 0.00750062);
+  delay(1000);
+  Serial.print("PackSize:");
+  Serial.println(PackSize);
+
+  while (digitalRead(BUTTON))
+  {
+    disp.clear();
+    disp.displayByte(_S, _E, _N, _D);
+
+    getInfo2();
+    fromLog();
+    delay(2000);
+  }
+
+  disp.clear();
+  disp.displayByte(_F, _L, _Y, _empty);
+  beeper(6000);
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+  //                                     FIRST STAGE                                               //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+  EEXPos = 0;
+  Maxspeed = 0;
+  Apogee = 0;
+  SEALEVELPRESSURE_HPA = bme.readPressure() / 100.0;
+  millisshift  = millis();
+  toLog("Start Logging");
+  disp.clear();
+
+  EEPROM.put(945, Apogee);
+  EEPROM.put(950, Maxspeed);
+
+  for (int FSTage = 1; FSTage <= Cycles; FSTage++)
+  {
+    Start2 = millis();
+
+    getdata();      // Получаем данные с датчиков в структуру
+    Writelog();     // Пишем данные в EEPROM
+    fallingSense(); // Не падаем ли?
+
+    if (Fallen and !MOSFET_1_IS_FIRED)
+
+    {
+      LANDING_PROCEDURE();
+    }
+
+    delay(92);
+    Finish2 = millis();
+    routineTime = Finish2 - Start2;
+   
+    if (DEBUG_OUT)
+    {
+      disp.displayInt(Altitude);
+    }
+  }
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+  //                                     PRAYING FOR RECOVERY                                      //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+  toLog("Finish Logging");
+
+  EEPROM.put(950, Maxspeed);
+  toLog("Maximum Speed " + String(Maxspeed));
+
+  getInfo2();
+  fromLog();
+
+  disp.clear();
+  disp.displayInt(Apogee);
+
+  while (1)
+  {
+    beeper(1000);
+    delay(1000);
+    beeper(1000);
+    delay(1000);
+
+    if (!digitalRead(BUTTON))
+      break;
+  }
+  while (1)
+    ;
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////
