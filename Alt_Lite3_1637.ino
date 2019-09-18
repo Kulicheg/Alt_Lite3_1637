@@ -23,15 +23,14 @@
 #define BUTTON 13
 #define BUZZER 15
 
-#define MOSFET1 10
-#define MOSFET2 9
+#define MOSFET1 9
+#define MOSFET2 10
 #define MOSFET3 0
 
 #define DEBUG_OUT true
-#define DEBUG_MOSFET false
+#define DEBUG_MOSFET true
 
 #define Cycles 600
-
 
 Adafruit_BMP280 bme;
 FM24C256 driveD(0x50);
@@ -231,6 +230,7 @@ void fallingSense()
       Fallen = true;
       toLog("LOW Spd A=" + String(Altitude) + "S=" + String(Speed));
       Apogee = Altitude;
+      EEPROM.put(945, Apogee);
     }
 
     if ((oldAltitude - newAltitude) > 2)
@@ -242,7 +242,7 @@ void fallingSense()
     }
 
     FirstTime = millis();
-    if (FirstTime - SecondTime >= 1000)
+    if (FirstTime - SecondTime > 999)
     {
       SecondTime = millis();
       oldAltitude = newAltitude;
@@ -257,7 +257,6 @@ void MOSFET_FIRE(byte Number)
   {
   case 1:
     disp.clear();
-    //disp.displayInt(8888);
     digitalWrite(MOSFET1, HIGH);
     beeper(300);
     digitalWrite(MOSFET1, LOW);
@@ -268,7 +267,6 @@ void MOSFET_FIRE(byte Number)
 
   case 2:
     disp.clear();
-    //disp.displayInt(8888);
     digitalWrite(MOSFET2, HIGH);
     beeper(300);
     digitalWrite(MOSFET2, LOW);
@@ -279,7 +277,6 @@ void MOSFET_FIRE(byte Number)
 
   case 3:
     disp.clear();
-    //disp.displayInt(8888);
     digitalWrite(MOSFET3, HIGH);
     beeper(300);
     digitalWrite(MOSFET3, LOW);
@@ -451,25 +448,33 @@ void LOGonOSD()
   disp.displayInt(Maxspeed);
   delay(6000);
 
+  /*
   disp.clear();
-  disp.displayInt(433);
-
-  //SendData();
+  disp.displayInt(433); 
+  SendData();
+ */
 }
 
 void test_mosfets()
 {
+ 
+  for (int q = 10; q >= 0; q--)
+  {
+    disp.displayInt(q);
+    delay(1000);
+    disp.clear();
+  }
 
   disp.clear();
   disp.displayInt(1);
-  MOSFET_FIRE(1);
   delay(2000);
-
+  MOSFET_FIRE(1);
+  
   disp.clear();
   disp.displayInt(2);
-  MOSFET_FIRE(2);
   delay(2000);
-
+  MOSFET_FIRE(2);
+ 
   disp.clear();
   disp.displayInt(3);
   delay(2000);
@@ -489,8 +494,6 @@ void setup()
   MOSFET_2_IS_FIRED = false;
   MOSFET_3_IS_FIRED = false;
 
-
-
   Fallen = false;
   Apogee = 0;
   Maxspeed = 0;
@@ -501,9 +504,9 @@ void setup()
   disp.clear();
   disp.brightness(7); // яркость, 0 - 7 (минимум - максимум)
 
-  pinMode(MOSFET1, OUTPUT);     //MOSFET#1
-  pinMode(MOSFET2, OUTPUT);     //MOSFET#2
-  pinMode(MOSFET3, OUTPUT);     //MOSFET#3
+  pinMode(MOSFET1, OUTPUT);      //MOSFET#1
+  pinMode(MOSFET2, OUTPUT);      //MOSFET#2
+  pinMode(MOSFET3, OUTPUT);      //MOSFET#3
   pinMode(BUTTON, INPUT_PULLUP); //BUTTON PIN
   pinMode(BUZZER, OUTPUT);       //BUZZER
 
@@ -621,7 +624,7 @@ void loop()
   Maxspeed = 0;
   Apogee = 0;
   SEALEVELPRESSURE_HPA = bme.readPressure() / 100.0;
-  millisshift  = millis();
+  millisshift = millis();
   toLog("Start Logging");
   disp.clear();
 
@@ -645,7 +648,7 @@ void loop()
     delay(92);
     Finish2 = millis();
     routineTime = Finish2 - Start2;
-   
+
     if (DEBUG_OUT)
     {
       disp.displayInt(Altitude);
