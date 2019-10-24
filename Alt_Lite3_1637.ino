@@ -63,6 +63,11 @@ boolean MOSFET_1_IS_FIRED, MOSFET_2_IS_FIRED, MOSFET_3_IS_FIRED;
 
 int Maxspeed;
 float Altitude;
+
+float Alt_filtered;
+float Alts[10];
+int Spd_max;
+
 int Apogee;
 int Temperature;
 float Speed;
@@ -91,6 +96,28 @@ struct SystemLog
 
 struct telemetrystruct telemetry;
 struct SystemLog capitansLog;
+
+
+
+void  AltFilter()
+{
+  for (pos = 0; pos < 2; pos++)
+  {
+    Alts[2 - pos] = Alts[1 - pos];
+  }
+Alts[0] = Altitude;  
+
+if(abs(Alts[0]-Alts[1]) > Spd_max)  
+{
+  Alts[0] = Alts[1] + (Alts[1]-Alts[2])
+} 
+
+}
+
+
+
+
+
 
 void beeper(int milsec)
 {
