@@ -30,7 +30,7 @@
 #define DEBUG_OUT true
 #define DEBUG_MOSFET true
 
-#define Cycles 600
+#define Cycles 1200
 
 Adafruit_BMP280 bme;
 FM24C256 driveD(0x50);
@@ -645,7 +645,7 @@ void loop()
       LANDING_PROCEDURE();
     }
 
-    delay(92);
+    delay(42);
     Finish2 = millis();
     routineTime = Finish2 - Start2;
 
