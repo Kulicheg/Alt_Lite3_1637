@@ -99,7 +99,7 @@ struct SystemLog capitansLog;
 
 
 
-void  AltFilter()
+float  AltFilter()
 {
   for (pos = 0; pos < 2; pos++)
   {
@@ -112,6 +112,17 @@ if(abs(Alts[0]-Alts[1]) > Spd_max)
   Alts[0] = Alts[1] + (Alts[1]-Alts[2])
 } 
 
+
+   for (pos = 3; pos < 8; pos++)
+  {
+    Alts[7 - pos] = Alts[6 - pos];
+  }
+  
+  Alts[3] = Alts[0];
+  
+  Alt_filtered = (Alts[3]+Alts[4]+Alts[5]+Alts[6]+Alts[7]) / 5;
+  
+ return Alt_filtered;
 }
 
 
