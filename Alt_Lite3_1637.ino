@@ -66,7 +66,7 @@ float Altitude;
 
 float Alt_filtered;
 float Alts[10];
-int Spd_max;
+int Spd_max = 30; //meters per tick
 
 int Apogee;
 int Temperature;
@@ -101,19 +101,20 @@ struct SystemLog capitansLog;
 
 float  AltFilter()
 {
-  for (pos = 0; pos < 2; pos++)
+  for (int pos = 0; pos < 2; pos++)
   {
     Alts[2 - pos] = Alts[1 - pos];
   }
+
 Alts[0] = Altitude;  
 
 if(abs(Alts[0]-Alts[1]) > Spd_max)  
 {
-  Alts[0] = Alts[1] + (Alts[1]-Alts[2])
+  Alts[0] = Alts[1] + (Alts[1]-Alts[2]);
 } 
 
 
-   for (pos = 3; pos < 8; pos++)
+   for (int pos = 3; pos < 8; pos++)
   {
     Alts[7 - pos] = Alts[6 - pos];
   }
