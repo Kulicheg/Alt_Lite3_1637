@@ -1,0 +1,50 @@
+#include <Arduino.h>
+
+float Alt_filtered;
+float Alts[8];
+int Spd_max = 30; //meters per tick
+int Altitude;
+
+float  AltFilter()
+{
+  for (int pos = 0; pos < 2; pos++)
+  {
+    Alts[2 - pos] = Alts[1 - pos];
+  }
+
+Alts[0] = Altitude;  
+
+if(abs(Alts[0]-Alts[1]) > Spd_max)  
+{
+  Alts[0] = Alts[1] + (Alts[1]-Alts[2]);
+} 
+
+
+   for (int pos = 3; pos < 8; pos++)
+  {
+    Alts[7 - pos] = Alts[6 - pos];
+  }
+  
+  Alts[3] = Alts[0];
+  
+  Alt_filtered = (Alts[3]+Alts[4]+Alts[5]+Alts[6]+Alts[7]) / 5;
+  
+ return Alt_filtered;
+
+}
+
+void setup()
+
+{
+
+//  
+}
+
+void loop()
+{
+
+Altitude++;
+
+Serial.println (AltFilter());
+
+}
