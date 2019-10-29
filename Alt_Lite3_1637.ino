@@ -101,29 +101,30 @@ struct SystemLog capitansLog;
 
 float  AltFilter()
 {
+
   for (int pos = 0; pos < 2; pos++)
   {
     Alts[2 - pos] = Alts[1 - pos];
   }
 
-Alts[0] = Altitude;  
+  Alts[0] = Altitude;
 
-if(abs(Alts[0]-Alts[1]) > Spd_max)  
-{
-  Alts[0] = Alts[1] + (Alts[1]-Alts[2]);
-} 
+  if (abs(Alts[0] - Alts[1]) > Spd_max)
+  {
+    Alts[0] = Alts[1] + (Alts[1] - Alts[2]);
+  }
 
 
-   for (int pos = 3; pos < 8; pos++)
+  for (int pos = 0; pos < 4; pos++)
   {
     Alts[7 - pos] = Alts[6 - pos];
   }
-  
+
   Alts[3] = Alts[0];
-  
-  Alt_filtered = (Alts[3]+Alts[4]+Alts[5]+Alts[6]+Alts[7]) / 5;
-  
- return Alt_filtered;
+
+  Alt_filtered = (Alts[3] + Alts[4] + Alts[5] + Alts[6] + Alts[7]) / 5;
+
+  return Alt_filtered;
 }
 
 
@@ -264,14 +265,6 @@ void fallingSense()
   if (!Fallen)
   {
 
-    if (Speed < 4 and Altitude > 30)
-    {
-      Fallen = true;
-      toLog("LOW Spd A=" + String(Altitude) + "S=" + String(Speed));
-      Apogee = Altitude;
-      EEPROM.put(945, Apogee);
-    }
-
     if ((oldAltitude - newAltitude) > 2)
     {
       Apogee = oldAltitude;
@@ -281,11 +274,11 @@ void fallingSense()
     }
 
     FirstTime = millis();
-    if (FirstTime - SecondTime > 999)
+    if (FirstTime - SecondTime > 500)
     {
       SecondTime = millis();
       oldAltitude = newAltitude;
-      newAltitude = Altitude;
+      newAltitude = AltFilter();
     }
   }
 }
@@ -294,35 +287,35 @@ void MOSFET_FIRE(byte Number)
 {
   switch (Number)
   {
-  case 1:
-    disp.clear();
-    digitalWrite(MOSFET1, HIGH);
-    beeper(300);
-    digitalWrite(MOSFET1, LOW);
-    MOSFET_1_IS_FIRED = true;
-    toLog("MOSFET_1 IS FIRED");
-    disp.clear();
-    break;
+    case 1:
+      disp.clear();
+      digitalWrite(MOSFET1, HIGH);
+      beeper(300);
+      digitalWrite(MOSFET1, LOW);
+      MOSFET_1_IS_FIRED = true;
+      toLog("MOSFET_1 IS FIRED");
+      disp.clear();
+      break;
 
-  case 2:
-    disp.clear();
-    digitalWrite(MOSFET2, HIGH);
-    beeper(300);
-    digitalWrite(MOSFET2, LOW);
-    MOSFET_2_IS_FIRED = true;
-    toLog("MOSFET_2 IS FIRED");
-    disp.clear();
-    break;
+    case 2:
+      disp.clear();
+      digitalWrite(MOSFET2, HIGH);
+      beeper(300);
+      digitalWrite(MOSFET2, LOW);
+      MOSFET_2_IS_FIRED = true;
+      toLog("MOSFET_2 IS FIRED");
+      disp.clear();
+      break;
 
-  case 3:
-    disp.clear();
-    digitalWrite(MOSFET3, HIGH);
-    beeper(300);
-    digitalWrite(MOSFET3, LOW);
-    MOSFET_3_IS_FIRED = true;
-    toLog("MOSFET_3 IS FIRED");
-    disp.clear();
-    break;
+    case 3:
+      disp.clear();
+      digitalWrite(MOSFET3, HIGH);
+      beeper(300);
+      digitalWrite(MOSFET3, LOW);
+      MOSFET_3_IS_FIRED = true;
+      toLog("MOSFET_3 IS FIRED");
+      disp.clear();
+      break;
   }
 }
 
@@ -425,16 +418,16 @@ void LANDING_PROCEDURE()
 }
 
 /* void sendheader(byte command)
-{
+  {
   for (byte q = 0; q < 4; q++)
   {
     Serial.write(header[q]);
   }
   Serial.write(command);
-}
+  }
 
-void SendData()
-{
+  void SendData()
+  {
   sendheader(01);
 
   Serial.write(NumRec);
@@ -471,7 +464,7 @@ void SendData()
   }
   Serial.flush();
   ////////////////////////////////////////////////////////////////////////////////////////////////
-} */
+  } */
 
 void LOGonOSD()
 {
@@ -488,15 +481,15 @@ void LOGonOSD()
   delay(6000);
 
   /*
-  disp.clear();
-  disp.displayInt(433); 
-  SendData();
- */
+    disp.clear();
+    disp.displayInt(433);
+    SendData();
+  */
 }
 
 void test_mosfets()
 {
- 
+
   for (int q = 10; q >= 0; q--)
   {
     disp.displayInt(q);
@@ -508,12 +501,12 @@ void test_mosfets()
   disp.displayInt(1);
   delay(2000);
   MOSFET_FIRE(1);
-  
+
   disp.clear();
   disp.displayInt(2);
   delay(2000);
   MOSFET_FIRE(2);
- 
+
   disp.clear();
   disp.displayInt(3);
   delay(2000);
@@ -596,13 +589,13 @@ void setup()
   beeper(250);
 
   int8_t welcome_banner[] = {
-      _H,
-      _E,
-      _L,
-      _L,
-      _O,
-      _empty,
-      _empty,
+    _H,
+    _E,
+    _L,
+    _L,
+    _O,
+    _empty,
+    _empty,
   };
   disp.clear();
   disp.runningString(welcome_banner, sizeof(welcome_banner), 200);
