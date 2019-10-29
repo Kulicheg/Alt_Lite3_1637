@@ -28,9 +28,9 @@
 #define MOSFET3 0
 
 #define DEBUG_OUT true
-#define DEBUG_MOSFET true
+#define DEBUG_MOSFET false
 
-#define Cycles 1200
+#define Cycles 600
 
 Adafruit_BMP280 bme;
 FM24C256 driveD(0x50);
@@ -97,9 +97,7 @@ struct SystemLog
 struct telemetrystruct telemetry;
 struct SystemLog capitansLog;
 
-
-
-float  AltFilter()
+float AltFilter()
 {
 
   for (int pos = 0; pos < 2; pos++)
@@ -114,7 +112,6 @@ float  AltFilter()
     Alts[0] = Alts[1] + (Alts[1] - Alts[2]);
   }
 
-
   for (int pos = 0; pos < 4; pos++)
   {
     Alts[7 - pos] = Alts[6 - pos];
@@ -124,13 +121,13 @@ float  AltFilter()
 
   Alt_filtered = (Alts[3] + Alts[4] + Alts[5] + Alts[6] + Alts[7]) / 5;
 
+  if (DEBUG_OUT)
+  {
+    Serial.println( String (millis() - millisshift) + ":Alt_filtered = " + String(Alt_filtered));
+  }
+
   return Alt_filtered;
 }
-
-
-
-
-
 
 void beeper(int milsec)
 {
@@ -257,11 +254,21 @@ void getdata()
   telemetry.Altitude = Altitude;
   telemetry.Speed = speedOmeter();
 
+
+  if (DEBUG_OUT)
+  {
+    Serial.println( String (millis() - millisshift) + ":  Altitude = " + String(Altitude));
+  }
+
+
+
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
 void fallingSense()
 {
+  int filtered = AltFilter();
+  
   if (!Fallen)
   {
 
@@ -271,6 +278,11 @@ void fallingSense()
       toLog("Falling detected " + String(Apogee));
       EEPROM.put(945, Apogee);
       Fallen = true;
+
+      if (DEBUG_OUT)
+      {
+        Serial.println( String (millis() - millisshift) + ":  Falling detected at " + String(Apogee));
+      }
     }
 
     FirstTime = millis();
@@ -278,7 +290,7 @@ void fallingSense()
     {
       SecondTime = millis();
       oldAltitude = newAltitude;
-      newAltitude = AltFilter();
+      newAltitude = filtered;
     }
   }
 }
@@ -635,15 +647,33 @@ void loop()
   Serial.print("PackSize:");
   Serial.println(PackSize);
 
-  while (digitalRead(BUTTON))
+
+
+
+  if (!DEBUG_OUT)
+  {
+    while (digitalRead(BUTTON))
+    {
+      disp.clear();
+      disp.displayByte(_S, _E, _N, _D);
+
+      getInfo2();
+      fromLog();
+      delay(2000);
+    }
+  }
+  else
   {
     disp.clear();
-    disp.displayByte(_S, _E, _N, _D);
+    disp.displayByte(_t, _e, _S, _t);
 
     getInfo2();
     fromLog();
     delay(2000);
   }
+
+
+
 
   disp.clear();
   disp.displayByte(_F, _L, _Y, _empty);
