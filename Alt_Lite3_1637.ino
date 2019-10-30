@@ -551,8 +551,10 @@ void setup()
   pinMode(MOSFET1, OUTPUT);      //MOSFET#1
   pinMode(MOSFET2, OUTPUT);      //MOSFET#2
   pinMode(MOSFET3, OUTPUT);      //MOSFET#3
-  pinMode(BUTTON, INPUT_PULLUP); //BUTTON PIN
-  pinMode(BUZZER, OUTPUT);       //BUZZER
+  pinMode(BUTTON, INPUT);       //BUTTON PIN
+  pinMode(BUZZER, OUTPUT);      //BUZZER
+  pinMode(14, OUTPUT);          //GND
+  digitalWrite (14, LOW);
 
   beeper(250);
 
@@ -629,7 +631,7 @@ void setup()
 //------------------------------------------------------------------------------
 void loop()
 {
-  if (!digitalRead(BUTTON))
+  if (digitalRead(BUTTON))
   {
     LOGonOSD();
   }
@@ -650,9 +652,7 @@ void loop()
 
 
 
-  if (!DEBUG_OUT)
-  {
-    while (digitalRead(BUTTON))
+      while (!digitalRead(BUTTON))
     {
       disp.clear();
       disp.displayByte(_S, _E, _N, _D);
@@ -661,18 +661,7 @@ void loop()
       fromLog();
       delay(2000);
     }
-  }
-  else
-  {
-    disp.clear();
-    disp.displayByte(_t, _e, _S, _t);
-
-    getInfo2();
-    fromLog();
-    delay(2000);
-  }
-
-
+  
 
 
   disp.clear();
@@ -739,7 +728,7 @@ void loop()
     beeper(1000);
     delay(1000);
 
-    if (!digitalRead(BUTTON))
+    if (digitalRead(BUTTON))
       break;
   }
   while (1)
