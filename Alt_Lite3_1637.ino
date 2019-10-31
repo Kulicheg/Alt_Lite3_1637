@@ -726,7 +726,7 @@ void loop()
       LANDING_PROCEDURE();
     }
 
-    delay(42);
+    delay(Tick);
     Finish2 = millis();
     routineTime = Finish2 - Start2;
 
