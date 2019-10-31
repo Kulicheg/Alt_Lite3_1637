@@ -37,6 +37,8 @@ FM24C256 driveD(0x50);
 MPU9250 IMU(Wire, 0x68);
 GyverTM1637 disp(CLK, DIO);
 
+
+int Tick = 42;
 float SEALEVELPRESSURE_HPA;
 int EEPOS = 0;
 int EEXPos;
@@ -269,7 +271,7 @@ void fallingSense()
 {
   int filtered = AltFilter();
 
-  if (!Fallen)
+  if (!Fallen and Altitude > 10 and Speed < 20)
   {
 
     if ((oldAltitude - newAltitude) > 2)
