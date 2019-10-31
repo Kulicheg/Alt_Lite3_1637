@@ -66,7 +66,7 @@ float Altitude;
 
 float Alt_filtered;
 float Alts[10];
-int Spd_max = 30; //meters per tick
+int Spd_max = 17; //meters per tick (17 -> 340 m/s @ 50ms)
 
 int Apogee;
 int Temperature;
@@ -123,7 +123,7 @@ float AltFilter()
 
   if (DEBUG_OUT)
   {
-    Serial.println( String (millis() - millisshift) + ":Alt_filtered = " + String(Alt_filtered));
+    Serial.println( String (millis() - millisshift) + ":Alt_filtered:" + String(Alt_filtered));
   }
 
   return Alt_filtered;
@@ -257,7 +257,7 @@ void getdata()
 
   if (DEBUG_OUT)
   {
-    Serial.println( String (millis() - millisshift) + ":  Altitude = " + String(Altitude));
+    Serial.println( String (millis() - millisshift) + ":Altitude :" + String(Altitude));
   }
 
 
@@ -268,7 +268,7 @@ void getdata()
 void fallingSense()
 {
   int filtered = AltFilter();
-  
+
   if (!Fallen)
   {
 
@@ -281,7 +281,7 @@ void fallingSense()
 
       if (DEBUG_OUT)
       {
-        Serial.println( String (millis() - millisshift) + ":  Falling detected at " + String(Apogee));
+        Serial.println( String (millis() - millisshift) + ":Falling detected at:" + String(Apogee));
       }
     }
 
@@ -545,6 +545,12 @@ void setup()
   JournalSize = sizeof(capitansLog);
   PackSize = sizeof(telemetry);
 
+  if (DEBUG_OUT)
+  {
+    Serial.println( String (millis() - millisshift) + ":Wake up and shine!:");
+  }
+
+
   disp.clear();
   disp.brightness(7); // яркость, 0 - 7 (минимум - максимум)
 
@@ -571,6 +577,12 @@ void setup()
     }
   }
 
+  if (DEBUG_OUT)
+  {
+    Serial.println( String (millis() - millisshift) + ":BMP280 initialised:");
+  }
+
+
   int status = IMU.begin();
   if (status < 0)
   {
@@ -583,13 +595,18 @@ void setup()
     {
     }
   }
+  if (DEBUG_OUT)
+  {
+    Serial.println( String (millis() - millisshift) + ":IMU-9250 initialised:");
+  }
+
 
   for (int q = 0; q < 16; q++)
   {
     byte testbyte = random(255);
-    driveD.write(32000 + q, testbyte);
+    driveD.write(32500 + q, testbyte);
 
-    if (driveD.read(32000 + q) != testbyte)
+    if (driveD.read(32500 + q) != testbyte)
     {
       Serial.println("EXTERNAL EEPROM ERROR!");
       disp.clear();
@@ -598,6 +615,11 @@ void setup()
       {
       }
     }
+  }
+
+  if (DEBUG_OUT)
+  {
+    Serial.println( String (millis() - millisshift) + ":FRAM initialised:");
   }
 
   beeper(250);
@@ -646,23 +668,28 @@ void loop()
   disp.clear();
   disp.displayInt(bme.readPressure() * 0.00750062);
   delay(1000);
+
+  toLog("Pressure = " + String(bme.readPressure()) + " Pa");
+
+
+
   Serial.print("PackSize:");
   Serial.println(PackSize);
 
 
 
 
-      while (!digitalRead(BUTTON))
-    {
-      disp.clear();
-      disp.displayByte(_S, _E, _N, _D);
+  while (!digitalRead(BUTTON))
+  {
+    disp.clear();
+    disp.displayByte(_S, _E, _N, _D);
 
-      getInfo2();
-      fromLog();
-      delay(2000);
-    }
-  
-
+    getInfo2();
+    fromLog();
+    disp.clear();
+    delay(500);
+    beeper(50);
+  }
 
   disp.clear();
   disp.displayByte(_F, _L, _Y, _empty);
@@ -677,6 +704,7 @@ void loop()
   SEALEVELPRESSURE_HPA = bme.readPressure() / 100.0;
   millisshift = millis();
   toLog("Start Logging");
+
   disp.clear();
 
   EEPROM.put(945, Apogee);
@@ -700,10 +728,6 @@ void loop()
     Finish2 = millis();
     routineTime = Finish2 - Start2;
 
-    if (DEBUG_OUT)
-    {
-      disp.displayInt(Altitude);
-    }
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
