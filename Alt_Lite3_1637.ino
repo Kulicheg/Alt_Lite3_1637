@@ -17,6 +17,7 @@
 #include <FM24C256.h>
 #include "MPU9250.h"
 #include "GyverTM1637.h"
+#include <GyverTimer.h>
 
 #define CLK 12
 #define DIO 11
@@ -36,9 +37,9 @@ Adafruit_BMP280 bme;
 FM24C256 driveD(0x50);
 MPU9250 IMU(Wire, 0x68);
 GyverTM1637 disp(CLK, DIO);
+GTimer_ms Tick_Tock;
 
-
-int Tick = 42;
+int Tick = 50;
 float SEALEVELPRESSURE_HPA;
 int EEPOS = 0;
 int EEXPos;
@@ -125,7 +126,7 @@ float AltFilter()
 
   if (DEBUG_OUT)
   {
-    Serial.println( String (millis() - millisshift) + ":Alt_filtered:" + String(Alt_filtered));
+    Serial.println(String(millis() - millisshift) + ":Alt_filtered:" + String(Alt_filtered));
   }
 
   return Alt_filtered;
@@ -256,13 +257,10 @@ void getdata()
   telemetry.Altitude = Altitude;
   telemetry.Speed = speedOmeter();
 
-
   if (DEBUG_OUT)
   {
-    Serial.println( String (millis() - millisshift) + ":Altitude :" + String(Altitude));
+    Serial.println(String(millis() - millisshift) + ":Altitude :" + String(Altitude));
   }
-
-
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 }
@@ -283,7 +281,7 @@ void fallingSense()
 
       if (DEBUG_OUT)
       {
-        Serial.println( String (millis() - millisshift) + ":Falling detected at:" + String(Apogee));
+        Serial.println(String(millis() - millisshift) + ":Falling detected at:" + String(Apogee));
       }
     }
 
@@ -549,20 +547,19 @@ void setup()
 
   if (DEBUG_OUT)
   {
-    Serial.println( String (millis() - millisshift) + ":Wake up and shine!:");
+    Serial.println(String(millis() - millisshift) + ":Wake up and shine!:");
   }
-
 
   disp.clear();
   disp.brightness(7); // яркость, 0 - 7 (минимум - максимум)
 
-  pinMode(MOSFET1, OUTPUT);      //MOSFET#1
-  pinMode(MOSFET2, OUTPUT);      //MOSFET#2
-  pinMode(MOSFET3, OUTPUT);      //MOSFET#3
-  pinMode(BUTTON, INPUT);       //BUTTON PIN
-  pinMode(BUZZER, OUTPUT);      //BUZZER
-  pinMode(14, OUTPUT);          //GND
-  digitalWrite (14, LOW);
+  pinMode(MOSFET1, OUTPUT); //MOSFET#1
+  pinMode(MOSFET2, OUTPUT); //MOSFET#2
+  pinMode(MOSFET3, OUTPUT); //MOSFET#3
+  pinMode(BUTTON, INPUT);   //BUTTON PIN
+  pinMode(BUZZER, OUTPUT);  //BUZZER
+  pinMode(14, OUTPUT);      //GND
+  digitalWrite(14, LOW);
 
   beeper(250);
 
@@ -581,9 +578,8 @@ void setup()
 
   if (DEBUG_OUT)
   {
-    Serial.println( String (millis() - millisshift) + ":BMP280 initialised:");
+    Serial.println(String(millis() - millisshift) + ":BMP280 initialised:");
   }
-
 
   int status = IMU.begin();
   if (status < 0)
@@ -599,9 +595,8 @@ void setup()
   }
   if (DEBUG_OUT)
   {
-    Serial.println( String (millis() - millisshift) + ":IMU-9250 initialised:");
+    Serial.println(String(millis() - millisshift) + ":IMU-9250 initialised:");
   }
-
 
   for (int q = 0; q < 16; q++)
   {
@@ -621,7 +616,7 @@ void setup()
 
   if (DEBUG_OUT)
   {
-    Serial.println( String (millis() - millisshift) + ":FRAM initialised:");
+    Serial.println(String(millis() - millisshift) + ":FRAM initialised:");
   }
 
   beeper(250);
@@ -651,6 +646,8 @@ void setup()
 
   if (DEBUG_MOSFET)
     test_mosfets();
+
+  Tick_Tock.setInterval(Tick);
 }
 //------------------------------------------------------------------------------
 void loop()
@@ -673,13 +670,8 @@ void loop()
 
   toLog("Pressure = " + String(bme.readPressure()) + " Pa");
 
-
-
   Serial.print("PackSize:");
   Serial.println(PackSize);
-
-
-
 
   while (!digitalRead(BUTTON))
   {
@@ -714,6 +706,7 @@ void loop()
 
   for (int FSTage = 1; FSTage <= Cycles; FSTage++)
   {
+
     Start2 = millis();
 
     getdata();      // Получаем данные с датчиков в структуру
@@ -726,9 +719,23 @@ void loop()
       LANDING_PROCEDURE();
     }
 
-    delay(Tick);
+
+
+
+    while (!Tick_Tock.isReady())
+    {
+
+      // PUT HERE  SOMETHING LIKE CONTINIOUS TASK
+    }
+
+    if (DEBUG_OUT)
+    {
+      Serial.println("routineTime = " + String(routineTime));
+    }
+
     Finish2 = millis();
     routineTime = Finish2 - Start2;
+
 
   }
 
