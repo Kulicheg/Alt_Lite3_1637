@@ -5,7 +5,7 @@
 //I2C device found at address 0x68 !  AXL
 //I2C device found at address 0x76 !  BMP
 // 950 - 953 - Max Speed
-// 947 - 947 - NumRec
+// 960 - 960 - NumRec
 // 945 - 946 - Apogee
 //A,B,C,D,E,F,G,H,J,L,N,O,P,S,U,Y,a,b,c,d,e,f,h,i,j,l,n,o,q,r,t,u,y,dash,under,equal,empty,degree
 
@@ -24,22 +24,24 @@
 #define BUTTON 13
 #define BUZZER 15
 
-#define MOSFET1 9
-#define MOSFET2 10
+#define MOSFET1 10
+#define MOSFET2 9
 #define MOSFET3 0
 
-#define DEBUG_OUT true
+#define DEBUG_OUT false
 #define DEBUG_MOSFET false
 
-#define Cycles 600
+#define Cycles 1200
 
 Adafruit_BMP280 bme;
 FM24C256 driveD(0x50);
 MPU9250 IMU(Wire, 0x68);
 GyverTM1637 disp(CLK, DIO);
 GTimer_ms Tick_Tock;
+GTimer_ms Tick_Spd;
 
 int Tick = 50;
+int Spd_max = 17; //meters per tick (17 -> 340 m/s @ 50ms)
 float SEALEVELPRESSURE_HPA;
 int EEPOS = 0;
 int EEXPos;
@@ -69,7 +71,7 @@ float Altitude;
 
 float Alt_filtered;
 float Alts[10];
-int Spd_max = 17; //meters per tick (17 -> 340 m/s @ 50ms)
+
 
 int Apogee;
 int Temperature;
@@ -145,29 +147,27 @@ float speedOmeter()
   float FloatSpeed;
   Alt2 = bme.readAltitude(SEALEVELPRESSURE_HPA);
 
-  FirstTimeM = millis();
-
-  if (FirstTimeM - SecondTimeM > 100)
+   if (Tick_Spd.isReady())
   {
+    FirstTimeM = millis();
+    FloatSpeed = (Alt2 - Alt1) / (FirstTimeM - SecondTimeM) * 1000;
 
-    FloatSpeed = (Alt2 - Alt1) / (FirstTimeM - SecondTimeM) * 100000;
-
-    Speed = FloatSpeed / 100;
+    Speed = FloatSpeed;
     Alt1 = Alt2;
-    SecondTimeM = millis();
-
+    SecondTimeM = FirstTimeM;
     if (Speed > Maxspeed)
     {
       Maxspeed = Speed;
     }
   }
   return Speed;
+
 }
 
 void toLog(String message)
 {
 
-  if (EEPOS < 928)
+  if (EEPOS < 900)
   {
     int eventSize = sizeof(capitansLog);
     char event[25];
@@ -177,8 +177,9 @@ void toLog(String message)
     EEPROM.put(EEPOS, capitansLog);
     EEPOS = EEPOS + eventSize;
     NumRec = EEPOS / eventSize;
-    EEPROM.write(947, NumRec);
+   
   }
+   EEPROM.put(960, NumRec);
 }
 
 void Writelog()
@@ -334,9 +335,13 @@ void MOSFET_FIRE(byte Number)
 void fromLog()
 {
   Serial.println("-----------------------------------------------");
+  Serial.println("------------  CAPITAN'S LOG  ------------------");
+  Serial.println("-----------------------------------------------");
   int eventSize = sizeof(capitansLog);
 
-  NumRec = EEPROM.read(947);
+  
+  EEPROM.get(960, NumRec);
+  NumRec = 10;
 
   for (int msgCount = 0; msgCount < (eventSize * NumRec); msgCount = msgCount + eventSize)
   {
@@ -544,6 +549,7 @@ void setup()
 
   JournalSize = sizeof(capitansLog);
   PackSize = sizeof(telemetry);
+  Serial.println("PackSize" + String(PackSize));
 
   if (DEBUG_OUT)
   {
@@ -621,7 +627,7 @@ void setup()
 
   beeper(250);
 
-  int8_t welcome_banner[] = {
+  uint8_t welcome_banner[] = {
     _H,
     _E,
     _L,
@@ -648,6 +654,7 @@ void setup()
     test_mosfets();
 
   Tick_Tock.setInterval(Tick);
+  Tick_Spd.setInterval(200);
 }
 //------------------------------------------------------------------------------
 void loop()
@@ -687,11 +694,12 @@ void loop()
 
   disp.clear();
   disp.displayByte(_F, _L, _Y, _empty);
-  beeper(6000);
+  beeper(10000);
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                                     FIRST STAGE                                               //
   ///////////////////////////////////////////////////////////////////////////////////////////////////
+  EEPROM.update(960, 10);
   EEXPos = 0;
   Maxspeed = 0;
   Apogee = 0;
@@ -703,7 +711,7 @@ void loop()
 
   EEPROM.put(945, Apogee);
   EEPROM.put(950, Maxspeed);
-
+  
   for (int FSTage = 1; FSTage <= Cycles; FSTage++)
   {
 
@@ -725,7 +733,7 @@ void loop()
     while (!Tick_Tock.isReady())
     {
 
-      // PUT HERE  SOMETHING LIKE CONTINIOUS TASK
+      // PUT HERE  SOMETHING LIKE CONTINIOUS TASK but NOT Tick period
     }
 
     if (DEBUG_OUT)
@@ -747,6 +755,7 @@ void loop()
 
   EEPROM.put(950, Maxspeed);
   toLog("Maximum Speed " + String(Maxspeed));
+  EEPROM.update(960, NumRec);
 
   getInfo2();
   fromLog();
