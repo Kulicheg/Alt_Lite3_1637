@@ -11,7 +11,6 @@
 
 #include <Wire.h>
 #include <SPI.h>
-#include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h>
 #include <EEPROM.h>
 #include <FM24C256.h>
@@ -28,17 +27,23 @@
 #define MOSFET2 9
 #define MOSFET3 0
 
-#define DEBUG_OUT false
+#define BMP_SCK  (13)
+#define BMP_MISO (12)
+#define BMP_MOSI (11)
+#define BMP_CS   (10)
+
+#define DEBUG_OUT true
 #define DEBUG_MOSFET false
 
-#define Cycles 1200
+#define Cycles 1000
 
-Adafruit_BMP280 bme;
+Adafruit_BMP280 bmp;
 FM24C256 driveD(0x50);
 MPU9250 IMU(Wire, 0x68);
 GyverTM1637 disp(CLK, DIO);
 GTimer_ms Tick_Tock;
 GTimer_ms Tick_Spd;
+
 
 int Tick = 50;
 int Spd_max = 17; //meters per tick (17 -> 340 m/s @ 50ms)
@@ -145,9 +150,9 @@ float speedOmeter()
 {
 
   float FloatSpeed;
-  Alt2 = bme.readAltitude(SEALEVELPRESSURE_HPA);
+  Alt2 = bmp.readAltitude(SEALEVELPRESSURE_HPA);
 
-   if (Tick_Spd.isReady())
+  if (Tick_Spd.isReady())
   {
     FirstTimeM = millis();
     FloatSpeed = (Alt2 - Alt1) / (FirstTimeM - SecondTimeM) * 1000;
@@ -177,9 +182,9 @@ void toLog(String message)
     EEPROM.put(EEPOS, capitansLog);
     EEPOS = EEPOS + eventSize;
     NumRec = EEPOS / eventSize;
-   
+
   }
-   EEPROM.put(960, NumRec);
+  EEPROM.put(960, NumRec);
 }
 
 void Writelog()
@@ -237,11 +242,11 @@ void getdata()
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                                     OTHER SENSORS COLLECTION                                  //
   ///////////////////////////////////////////////////////////////////////////////////////////////////
-  Pressure = bme.readPressure();
+  Pressure = bmp.readPressure();
 
-  Altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
+  Altitude = bmp.readAltitude(SEALEVELPRESSURE_HPA);
 
-  Temperature = bme.readTemperature();
+  Temperature = bmp.readTemperature();
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -306,7 +311,7 @@ void MOSFET_FIRE(byte Number)
       beeper(300);
       digitalWrite(MOSFET1, LOW);
       MOSFET_1_IS_FIRED = true;
-      toLog("MOSFET_1 IS FIRED");
+      toLog(F("MOSFET_1 IS FIRED"));
       disp.clear();
       break;
 
@@ -316,7 +321,7 @@ void MOSFET_FIRE(byte Number)
       beeper(300);
       digitalWrite(MOSFET2, LOW);
       MOSFET_2_IS_FIRED = true;
-      toLog("MOSFET_2 IS FIRED");
+      toLog(F("MOSFET_2 IS FIRED"));
       disp.clear();
       break;
 
@@ -326,7 +331,25 @@ void MOSFET_FIRE(byte Number)
       beeper(300);
       digitalWrite(MOSFET3, LOW);
       MOSFET_3_IS_FIRED = true;
-      toLog("MOSFET_3 IS FIRED");
+      toLog(F("MOSFET_3 IS FIRED"));
+      disp.clear();
+      break;
+
+    case 9:
+      disp.clear();
+      digitalWrite(MOSFET1, HIGH);
+      digitalWrite(MOSFET2, HIGH);
+      digitalWrite(MOSFET3, HIGH);
+      beeper(300);
+      digitalWrite(MOSFET1, LOW);
+      digitalWrite(MOSFET2, LOW);
+      digitalWrite(MOSFET3, LOW);
+      MOSFET_1_IS_FIRED = true;
+      MOSFET_2_IS_FIRED = true;
+      MOSFET_3_IS_FIRED = true;
+      toLog(F("MOSFET_1 IS FIRED"));
+      toLog(F("MOSFET_2 IS FIRED"));
+      toLog(F("MOSFET_3 IS FIRED"));
       disp.clear();
       break;
   }
@@ -334,12 +357,12 @@ void MOSFET_FIRE(byte Number)
 
 void fromLog()
 {
-  Serial.println("-----------------------------------------------");
-  Serial.println("------------  CAPITAN'S LOG  ------------------");
-  Serial.println("-----------------------------------------------");
+  Serial.println(F("-----------------------------------------------"));
+  Serial.println(F("------------  CAPITAN'S LOG  ------------------"));
+  Serial.println(F("-----------------------------------------------"));
   int eventSize = sizeof(capitansLog);
 
-  
+
   EEPROM.get(960, NumRec);
   NumRec = 10;
 
@@ -350,7 +373,7 @@ void fromLog()
     Serial.print(capitansLog.timestamp);
     Serial.print(":");
     Serial.println(str);
-    Serial.println("-----------------------------------------------");
+    Serial.println(F("-----------------------------------------------"));
   }
 }
 
@@ -368,7 +391,7 @@ void getInfo2()
   PackSize = sizeof(telemetry);
   byte Packet[PackSize];
 
-  Serial.println("  Alt\t Spd\t Prs\t Tmp\t bx\t by\t bz\t gX\t gY\t gZ");
+  Serial.println(F("  Alt\t Spd\t Prs\t Tmp\t bx\t by\t bz\t gX\t gY\t gZ"));
   Serial.println(" ");
 
   for (int Rec = 0; Rec < Cycles; Rec++)
@@ -423,65 +446,17 @@ void getInfo2()
 
     EEXPos = EEXPos + PackSize;
   }
-  Serial.println("-----------------------------------------------------");
+  Serial.println(F("-----------------------------------------------------"));
   Serial.print(EEXPos);
-  Serial.println(" bytes of data");
+  Serial.println(F(" bytes of data"));
 }
 
 void LANDING_PROCEDURE()
 {
   toLog("LANDING_PROCEDURE@" + String(telemetry.Altitude));
-  MOSFET_FIRE(1);
+  MOSFET_FIRE(9);
 }
 
-/* void sendheader(byte command)
-  {
-  for (byte q = 0; q < 4; q++)
-  {
-    Serial.write(header[q]);
-  }
-  Serial.write(command);
-  }
-
-  void SendData()
-  {
-  sendheader(01);
-
-  Serial.write(NumRec);
-  Serial.write(highByte(Cycles));
-  Serial.write(lowByte(Cycles));
-  Serial.flush();
-  delay(200);
-
-  sendheader(02);
-
-  /////////////////////////////////////SEND CYCLES////////////////////////////////////////////////
-  for (int q = 0; q < Cycles * PackSize; q++)
-  {
-    byte Sendbyte = driveD.read(q);
-    Serial.write(Sendbyte);
-  }
-  Serial.flush();
-  delay(200);
-  ////////////////////////////////////////////////////////////////////////////////////////////////
-
-  /////////////////////////////////////SEND JOURNAL///////////////////////////////////////////////
-  for (int q = 0; q < NumRec * JournalSize; q++)
-  {
-    byte Sendbyte = EEPROM.read(q);
-    Serial.write(Sendbyte);
-  }
-  Serial.flush();
-  delay(200);
-  /////////////////////////////////////SEND DUMP////////////////////////////////////////////////
-  for (int q = 945; q < 1024; q++)
-  {
-    byte Sendbyte = EEPROM.read(q);
-    Serial.write(Sendbyte);
-  }
-  Serial.flush();
-  ////////////////////////////////////////////////////////////////////////////////////////////////
-  } */
 
 void LOGonOSD()
 {
@@ -572,20 +547,28 @@ void setup()
   Serial.begin(115200);
   Wire.begin();
 
-  if (!bme.begin())
+  if (!bmp.begin())
   {
     disp.clear();
     disp.displayInt(280);
-    Serial.println("BMP280 NOT FOUND!");
+    Serial.println(F("BMP280 NOT FOUND!"));
     while (1)
     {
     }
   }
 
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
+                  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
+                  Adafruit_BMP280::SAMPLING_X2,    /* Pressure oversampling */
+                  Adafruit_BMP280::FILTER_X4,      /* Filtering. */
+                  Adafruit_BMP280::STANDBY_MS_1); /* Standby time. */
+
+
   if (DEBUG_OUT)
   {
     Serial.println(String(millis() - millisshift) + ":BMP280 initialised:");
   }
+
 
   int status = IMU.begin();
   if (status < 0)
@@ -604,6 +587,7 @@ void setup()
     Serial.println(String(millis() - millisshift) + ":IMU-9250 initialised:");
   }
 
+
   for (int q = 0; q < 16; q++)
   {
     byte testbyte = random(255);
@@ -611,7 +595,7 @@ void setup()
 
     if (driveD.read(32500 + q) != testbyte)
     {
-      Serial.println("EXTERNAL EEPROM ERROR!");
+      Serial.println(F("EXT EEPROM ERROR!"));
       disp.clear();
       disp.displayInt(9999);
       while (1)
@@ -639,7 +623,7 @@ void setup()
   disp.clear();
   disp.runningString(welcome_banner, sizeof(welcome_banner), 200);
 
-  SEALEVELPRESSURE_HPA = bme.readPressure() / 100.0;
+  SEALEVELPRESSURE_HPA = bmp.readPressure() / 100.0;
 
   // setting the accelerometer full scale range to +/-16G
   IMU.setAccelRange(MPU9250::ACCEL_RANGE_16G);
@@ -669,13 +653,13 @@ void loop()
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 
   disp.clear();
-  disp.displayInt(bme.readAltitude(SEALEVELPRESSURE_HPA));
+  disp.displayInt(bmp.readAltitude(SEALEVELPRESSURE_HPA));
   delay(1000);
   disp.clear();
-  disp.displayInt(bme.readPressure() * 0.00750062);
+  disp.displayInt(bmp.readPressure() * 0.00750062);
   delay(1000);
 
-  toLog("Pressure = " + String(bme.readPressure()) + " Pa");
+  toLog("GNDPressure=" + String(bmp.readPressure()) + " Pa");
 
   Serial.print("PackSize:");
   Serial.println(PackSize);
@@ -694,8 +678,7 @@ void loop()
 
   disp.clear();
   disp.displayByte(_F, _L, _Y, _empty);
-  beeper(10000);
-
+  delay(500);
   ///////////////////////////////////////////////////////////////////////////////////////////////////
   //                                     FIRST STAGE                                               //
   ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -703,15 +686,24 @@ void loop()
   EEXPos = 0;
   Maxspeed = 0;
   Apogee = 0;
-  SEALEVELPRESSURE_HPA = bme.readPressure() / 100.0;
+  SEALEVELPRESSURE_HPA = bmp.readPressure() / 100.0;
   millisshift = millis();
   toLog("Start Logging");
 
-  disp.clear();
+
 
   EEPROM.put(945, Apogee);
   EEPROM.put(950, Maxspeed);
-  
+
+  int Alt3 = -1;
+  while (Alt3 < 1)
+  {
+    Alt3 = bmp.readAltitude(SEALEVELPRESSURE_HPA);
+    Serial.print(bmp.readAltitude(SEALEVELPRESSURE_HPA));
+    Serial.println(Alt3);
+  }
+  disp.clear();
+
   for (int FSTage = 1; FSTage <= Cycles; FSTage++)
   {
 
@@ -754,7 +746,11 @@ void loop()
   toLog("Finish Logging");
 
   EEPROM.put(950, Maxspeed);
-  toLog("Maximum Speed " + String(Maxspeed));
+  toLog("Max. Speed " + String(Maxspeed));
+
+  EEPROM.put(945, Apogee);
+  toLog("Apogee " + String(Apogee));
+
   EEPROM.update(960, NumRec);
 
   getInfo2();
