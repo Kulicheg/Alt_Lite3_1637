@@ -325,31 +325,19 @@ void MOSFET_FIRE(byte Number)
       disp.clear();
       break;
 
-    case 3:
-      disp.clear();
-      digitalWrite(MOSFET3, HIGH);
-      beeper(300);
-      digitalWrite(MOSFET3, LOW);
-      MOSFET_3_IS_FIRED = true;
-      toLog(F("MOSFET_3 IS FIRED"));
-      disp.clear();
-      break;
-
     case 9:
       disp.clear();
       digitalWrite(MOSFET1, HIGH);
       digitalWrite(MOSFET2, HIGH);
-      digitalWrite(MOSFET3, HIGH);
       beeper(300);
       digitalWrite(MOSFET1, LOW);
       digitalWrite(MOSFET2, LOW);
-      digitalWrite(MOSFET3, LOW);
       MOSFET_1_IS_FIRED = true;
       MOSFET_2_IS_FIRED = true;
       MOSFET_3_IS_FIRED = true;
       toLog(F("MOSFET_1 IS FIRED"));
       toLog(F("MOSFET_2 IS FIRED"));
-      toLog(F("MOSFET_3 IS FIRED"));
+
       disp.clear();
       break;
   }
@@ -695,8 +683,8 @@ void loop()
   EEPROM.put(945, Apogee);
   EEPROM.put(950, Maxspeed);
 
-  int Alt3 = -1;
-  while (Alt3 < 1)
+  float Alt3 = -1;
+  while (Alt3 < 2)
   {
     Alt3 = bmp.readAltitude(SEALEVELPRESSURE_HPA);
     Serial.print(bmp.readAltitude(SEALEVELPRESSURE_HPA));
